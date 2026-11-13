@@ -5,7 +5,7 @@ process.env.COD_MAX_AMOUNT = '100000';
 
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { createHmac } from 'crypto';
+import { createHmac, randomUUID } from 'crypto';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { setupApp } from '../src/app.setup';
@@ -491,5 +491,149 @@ describe('iGaz MVP — parcours complet', () => {
     const res = await http().get(`/products?zoneId=${ids.yop}`).expect(200);
     expect(res.body).toHaveLength(0);
     await http().post(`/admin/suppliers/${supplier.id}/approve`).set(auth('admin')).expect(201);
+  });
+
+  // ------------------------------------------------------ panier multi-dépôts
+  describe('panier multi-dépôts', () => {
+    const signed = (body: object) => {
+      const raw = JSON.stringify(body);
+      const sig = createHmac('sha256', process.env.PAYMENT_WEBHOOK_SECRET!).update(raw).digest('hex');
+      return http().post('/payments/webhook').set('Content-Type', 'application/json').set('x-igaz-signature', sig).send(raw);
+    };
+    // Dépôt A livre à Cocody (adresse du client) ; dépôt B est à Yopougon : retrait.
+    const cart = (qtyB = 1) => [
+      { storeId: ids.storeA, fulfillment: 'DELIVERY', items: [{ productId: ids.prodA, kind: 'PURCHASE', quantity: 1 }] },
+      { storeId: ids.storeB, fulfillment: 'PICKUP', items: [{ productId: ids.prodB, kind: 'PURCHASE', quantity: qtyB }] },
+    ];
+    const counts = async () => [await prisma.checkout.count(), await prisma.order.count()];
+
+    it('forme du panier : 3 dépôts au plus, pas de doublon, messages en français', async () => {
+      await http().put(`/stores/${ids.storeA}/products/${ids.prodA}/stock`).set(auth('supA')).send({ quantity: 10 }).expect(200);
+      await http().put(`/stores/${ids.storeB}/products/${ids.prodB}/stock`).set(auth('supB')).send({ quantity: 10 }).expect(200);
+      const fake = () => ({ storeId: randomUUID(), fulfillment: 'PICKUP', items: [{ productId: ids.prodA, kind: 'PURCHASE', quantity: 1 }] });
+      const tooMany = await http().post('/checkouts').set(auth('client')).send({
+        paymentMethod: 'MOBILE_MONEY', stores: [fake(), fake(), fake(), fake()],
+      }).expect(400);
+      expect(tooMany.body.message).toBe('Un panier peut contenir au plus 3 dépôts');
+      await http().post('/checkouts').set(auth('client')).send({
+        paymentMethod: 'MOBILE_MONEY', addressId: ids.addr, stores: [cart()[0], cart()[0]],
+      }).expect(400);
+      await http().post('/checkouts').set(auth('client')).send({ paymentMethod: 'MOBILE_MONEY', stores: [] }).expect(400);
+      await http().post('/checkouts').set(auth('supA')).send({ paymentMethod: 'MOBILE_MONEY', addressId: ids.addr, stores: cart() }).expect(403);
+    });
+
+    it('tout ou rien : un dépôt en défaut bloque tout le panier, et le message le nomme', async () => {
+      const before = await counts();
+      const stock = await http().post('/checkouts').set(auth('client')).send({
+        paymentMethod: 'MOBILE_MONEY', addressId: ids.addr, stores: cart(50),
+      }).expect(409);
+      expect(stock.body.message).toMatch(/^Dépôt B : Stock insuffisant/);
+      // Dépôt B ne livre pas à Cocody
+      const zone = await http().post('/checkouts').set(auth('client')).send({
+        paymentMethod: 'MOBILE_MONEY', addressId: ids.addr, stores: [cart()[0], { ...cart()[1], fulfillment: 'DELIVERY' }],
+      }).expect(422);
+      expect(zone.body.message).toBe('Dépôt B : Cette boutique ne livre pas dans votre zone');
+      // Livraison sans adresse
+      await http().post('/checkouts').set(auth('client')).send({ paymentMethod: 'MOBILE_MONEY', stores: cart() }).expect(400);
+      expect(await counts()).toEqual(before); // rien n'a été créé, pas même la commande du dépôt A
+    });
+
+    it('une commande par dépôt, cloisonnées ; le panier se paie en une fois, jamais commande par commande', async () => {
+      const res = await http().post('/checkouts').set(auth('client')).send({
+        paymentMethod: 'MOBILE_MONEY', addressId: ids.addr, stores: cart(),
+      }).expect(201);
+      const ck = res.body;
+      ids.checkout = ck.id;
+      expect(ck.code).toMatch(/^PN-[0-9A-F]{8}$/);
+      expect(ck.orders).toHaveLength(2);
+      const [a, b] = ck.orders;
+      ids.ckA = a.id; ids.ckB = b.id;
+      expect(a.storeId).toBe(ids.storeA);
+      expect(b.storeId).toBe(ids.storeB);
+      expect([a.status, b.status]).toEqual(['PENDING_PAYMENT', 'PENDING_PAYMENT']);
+      expect(a.total).toBe(7500 + 500); // frais de livraison du dépôt A
+      expect(b.total).toBe(7000); // retrait : pas de frais
+      expect(ck.total).toBe(15000);
+      expect(a.confirmationCode).toMatch(/^\d{6}$/);
+      expect(b.confirmationCode).toMatch(/^\d{6}$/);
+      expect(a.code).not.toBe(b.code);
+
+      // Cloisonnement : chaque dépôt ne voit que sa commande, sans le panier ni le code client
+      const asA = await http().get(`/orders/${a.id}`).set(auth('supA')).expect(200);
+      expect(asA.body.checkout).toBeUndefined();
+      expect(asA.body.confirmationCode).toBeUndefined();
+      await http().get(`/orders/${b.id}`).set(auth('supA')).expect(404);
+      const listB = await http().get('/orders').set(auth('supB')).expect(200);
+      expect(listB.body.map((o: any) => o.id)).not.toContain(a.id);
+      await http().get(`/checkouts/${ck.id}`).set(auth('client2')).expect(404);
+      await http().get(`/checkouts/${ck.id}`).set(auth('supA')).expect(403);
+      const mine = await http().get(`/checkouts/${ck.id}`).set(auth('client')).expect(200);
+      expect(mine.body.orders.map((o: any) => o.id)).toEqual([a.id, b.id]);
+
+      // Non payées : les dépôts ne peuvent pas accepter ; pas de paiement commande par commande
+      await http().post(`/orders/${a.id}/accept`).set(auth('supA')).expect(409);
+      await http().post(`/orders/${a.id}/payments`).set(auth('client')).send({ idempotencyKey: 'commande-seule-01' }).expect(409);
+    });
+
+    it('paiement unique : idempotent, confirmé par le webhook pour toutes les commandes, rejeu sans effet', async () => {
+      const k = 'panier-cle-000001';
+      const p1 = await http().post(`/checkouts/${ids.checkout}/payments`).set(auth('client')).send({ idempotencyKey: k }).expect(200);
+      const p2 = await http().post(`/checkouts/${ids.checkout}/payments`).set(auth('client')).send({ idempotencyKey: k }).expect(200);
+      const p3 = await http().post(`/checkouts/${ids.checkout}/payments`).set(auth('client')).send({ idempotencyKey: 'panier-cle-000002' }).expect(200);
+      expect(p1.body.amount).toBe(15000);
+      expect(p2.body.id).toBe(p1.body.id);
+      expect(p3.body.id).toBe(p1.body.id);
+      expect(await prisma.payment.count({ where: { checkoutId: ids.checkout } })).toBe(1);
+      await http().post(`/checkouts/${ids.checkout}/payments`).set(auth('client2')).send({ idempotencyKey: 'pirate-panier-01' }).expect(404);
+
+      const payload = { reference: p1.body.id, status: 'SUCCEEDED', amount: 15000, providerRef: 'WAVE-PANIER-1' };
+      await signed({ ...payload, amount: 8000 }).expect(400); // montant d'une seule commande : refusé
+      await signed(payload).expect(200);
+      expect((await signed(payload).expect(200)).body.duplicate).toBe(true);
+
+      for (const id of [ids.ckA, ids.ckB]) {
+        const o = await http().get(`/orders/${id}`).set(auth('client')).expect(200);
+        expect(o.body.status).toBe('SUBMITTED');
+        expect(o.body.paidOnline).toBe(true);
+        expect(o.body.events.filter((e: any) => e.status === 'SUBMITTED')).toHaveLength(1);
+      }
+      await http().post(`/checkouts/${ids.checkout}/payments`).set(auth('client')).send({ idempotencyKey: 'panier-cle-000003' }).expect(409);
+    });
+
+    it('un dépôt qui refuse n’affecte pas l’autre ; la part refusée est signalée payée (remboursement)', async () => {
+      await http().post(`/orders/${ids.ckA}/accept`).set(auth('supA')).expect(200);
+      await http().post(`/orders/${ids.ckB}/reject`).set(auth('supB')).send({ reason: 'Plus de stock' }).expect(200);
+      expect((await prisma.order.findUnique({ where: { id: ids.ckA } }))!.status).toBe('ACCEPTED');
+      const refused = await http().get(`/orders/${ids.ckB}`).set(auth('admin')).expect(200);
+      expect(refused.body.status).toBe('REJECTED');
+      expect(refused.body.paidOnline).toBe(true); // l'admin voit qu'un remboursement est à traiter
+      expect(refused.body.checkout.code).toMatch(/^PN-/);
+    });
+
+    it('une commande annulée avant le paiement n’est pas facturée', async () => {
+      const res = await http().post('/checkouts').set(auth('client')).send({
+        paymentMethod: 'MOBILE_MONEY', addressId: ids.addr, stores: cart(),
+      }).expect(201);
+      const [a, b] = res.body.orders;
+      await http().post(`/orders/${b.id}/cancel`).set(auth('client')).expect(200);
+      const p = await http().post(`/checkouts/${res.body.id}/payments`).set(auth('client')).send({ idempotencyKey: 'panier-annule-001' }).expect(200);
+      expect(p.body.amount).toBe(a.total);
+      await signed({ reference: p.body.id, status: 'SUCCEEDED', amount: a.total, providerRef: 'WAVE-PANIER-2' }).expect(200);
+      expect((await prisma.order.findUnique({ where: { id: a.id } }))!.status).toBe('SUBMITTED');
+      expect((await prisma.order.findUnique({ where: { id: b.id } }))!.status).toBe('CANCELLED');
+      expect(await prisma.orderEvent.count({ where: { orderId: b.id, note: { contains: 'remboursement' } } })).toBe(0);
+    });
+
+    it('paiement à la livraison : chaque dépôt encaisse sa commande, rien à payer en ligne', async () => {
+      const res = await http().post('/checkouts').set(auth('client')).send({
+        paymentMethod: 'CASH_ON_DELIVERY', addressId: ids.addr, stores: cart(),
+      }).expect(201);
+      expect(res.body.orders.map((o: any) => o.status)).toEqual(['SUBMITTED', 'SUBMITTED']);
+      for (const o of res.body.orders) {
+        expect(o.payments).toHaveLength(1);
+        expect(o.payments[0]).toMatchObject({ method: 'CASH_ON_DELIVERY', amount: o.total, status: 'PENDING' });
+      }
+      await http().post(`/checkouts/${res.body.id}/payments`).set(auth('client')).send({ idempotencyKey: 'panier-especes-01' }).expect(409);
+    });
   });
 });

@@ -9,32 +9,48 @@ messages d'erreur, textes d'interface et documentation sont **en français**.
 - Vision complète à long terme : `docs/iGaz_Cahier_des_charges.pdf`
 - Tout ce qui est « reporté » dans le cahier MVP (livreurs plateforme, commissions, abonnements, multi-fournisseurs,
   messagerie, avis, litiges) ne doit **pas** être développé sans accord explicite.
+  Le 13/11/2026, le propriétaire a donné son accord pour développer ceux que montre la maquette (messagerie, avis et notes,
+  espace livreur, abonnements, promotions, panier multi-dépôts), **chacun après validation d'un plan** (base + API + interface).
+  Commissions et litiges restent reportés. Fait : panier multi-dépôts. Ordre proposé ensuite : avis et notes, promotions,
+  messagerie, espace livreur, abonnements.
 
 ## Structure
 
 - `backend/` : API NestJS + Prisma + PostgreSQL
 - `web/` : interface Next.js (App Router, TypeScript), PWA responsive, mobile d'abord. Trois espaces : client (`/`, `/produit/[id]`,
-  `/commandes`), fournisseur (`/fournisseur/*`), administration (`/admin/*`). Design : voir « Design » ci-dessous.
+  `/commandes`, `/profil`), fournisseur (`/fournisseur/*`), administration (`/admin/*`). Design : voir « Design » ci-dessous.
 
 ## Commandes du web (depuis `web/`)
 
 - `npm run dev` — interface sur :3001 (`NEXT_PUBLIC_API_URL`, 3000 par défaut)
-- `npm run build` puis `npm run typecheck`
+- `npm run build` puis `npm run typecheck` (arrêter `npm run dev` avant : les deux écrivent dans `.next`)
+- PWA : `app/manifest.ts`, `public/sw.js` (actif en production seulement), icônes refaites par `npm run icons`.
+  Le service worker ne met **jamais** l'API en cache (stock et prix toujours en direct) ; il ne sert que la page
+  `/hors-ligne` quand une navigation échoue.
 - Essai local avec données de démonstration : démarrer l'API avec `EXPOSE_DEV_OTP=true` (le code SMS s'affiche à l'écran),
   puis `npm run seed:demo` côté backend (2 dépôts fictifs : connexion 07 01 00 01 01 / 07 01 00 01 02 ; admin : `ADMIN_PHONE`).
 
-## Design (ne pas diluer)
+## Design « iGaz CI » (maquette validée par le propriétaire le 13/11/2026, remplace l'ancienne identité « acier peint »)
 
-Identité « acier peint » : papier gris-vert, encre vert sombre, vert émail `#0c6b58`, jaune de signalisation `#ffc21a` réservé aux
-actions principales (lisible en plein soleil), rouille pour les alertes. Titres en Big Shoulders Display, texte en Atkinson
-Hyperlegible 17 px. Le choix de la bouteille se fait en touchant sa silhouette (hauteur proportionnelle à la capacité).
-Pas de majuscules d'étiquette, pas d'animation d'entrée, boutons d'au moins 44 px, textes en français simple, verbes d'action.
+Fond lavande clair `#f4f3fa`, cartes blanches arrondies (18 px) avec ombre douce, violet nuit (`#140f33` → `#2a1d6b`) pour les
+en-têtes vendeur/admin, l'écran de connexion et les cartes de chiffres. Orange pour les actions principales : dégradé
+`#e05a12` → `#c2410c` (plus foncé que la maquette pour que le texte blanc reste lisible au soleil) ; `#c2410c` pour les prix
+sur fond blanc ; `#f7931e` seulement en décor. Logo officiel : pictogramme « i » + bouteille à flamme (sources dans
+`docs/logo/`, détouré par `npm run logo` dans `web/public/images/`) suivi de « Gaz CI » en texte (`components/Logo.tsx`) ;
+icônes PWA refaites par `npm run icons`.
+Police Plus Jakarta Sans. Barre d'onglets en bas selon le rôle (`components/Shell.tsx`), icônes au trait dans
+`components/Icon.tsx`. Les jetons de couleur sont dans `app/globals.css` : ne pas écrire de couleur en dur dans les pages.
+Bouteilles dessinées à la couleur de la marque, hauteur proportionnelle à la capacité (`components/Cylinder.tsx`).
+Photos et logos de marques : seulement ceux fournis par iGaz (droits d'usage), déclarés dans `web/lib/media.ts` ; sans
+fichier, l'interface affiche une illustration. Boutons d'au moins 44 px, pas d'animation d'entrée, français simple, verbes d'action.
 
 ## Commandes du backend (depuis `backend/`)
 
 - `npm run start:dev` — API sur :3000 (PostgreSQL requis, voir `docker-compose.yml` et `.env.example`)
 - `npm test` — tests unitaires des règles métier
-- `npm run test:e2e` — parcours complet sur une vraie base (`TEST_DATABASE_URL`, base vidée à chaque lancement)
+- `npm run test:e2e` — parcours complet sur une vraie base (`TEST_DATABASE_URL`, base vidée à chaque lancement). En local :
+  base `igaz_test` sur le PostgreSQL du docker-compose (`CREATE DATABASE igaz_test`, puis `prisma migrate deploy` avec
+  `DATABASE_URL` pointant dessus), et `TEST_DATABASE_URL=postgresql://igaz:igaz@127.0.0.1:5432/igaz_test`. Jamais la base `igaz`.
 - `npx prisma migrate dev --name <nom>` — toute modification de `prisma/schema.prisma` passe par une migration
 - `npm run seed` — communes d'Abidjan, formats B3/B6/B12, compte admin (`ADMIN_PHONE`)
 
@@ -46,14 +62,17 @@ Pas de majuscules d'étiquette, pas d'animation d'entrée, boutons d'au moins 44
 - Échange : bouteille vide de **même marque et même capacité** (`isExchangeCompatible`). Pas de compatibilité inter-marques au MVP.
 - Un paiement mobile money n'est confirmé que par le webhook signé (jamais par le retour navigateur), de façon idempotente.
 - Une commande n'est clôturée qu'avec le code de confirmation du client, jamais sur simple déclaration du fournisseur.
+- Panier multi-dépôts (`Checkout`) : une commande par dépôt (jamais une commande à plusieurs dépôts), créées ensemble ou
+  pas du tout, 3 dépôts au plus. En mobile money, un seul `Payment` rattaché au `Checkout` (un paiement vise une commande
+  **ou** un panier, contrainte en base). Le dépôt ne voit jamais le panier (`present()` le retire).
 - Cloisonnement : un fournisseur ne voit jamais les boutiques, commandes ou finances d'un autre (réponse 404, pas 403).
 - Toute règle métier nouvelle ou modifiée s'accompagne d'un test (unitaire dans `order-rules.spec.ts` ou e2e dans `test/`).
 
 ## Reste à faire (ordre suggéré)
 
-1. **Interface web** : fait pour le MVP (client, fournisseur, administration). À faire : manifeste PWA et icônes, mode hors
-   ligne minimal, tests de bout en bout du navigateur dans la CI, tableau de bord de ventes pour le fournisseur, pagination
-   des commandes (l'API renvoie les 100 dernières).
+1. **Interface web** : fait pour le MVP (client, fournisseur, administration), PWA comprise (manifeste, icônes, page hors
+   ligne). À faire : tests de bout en bout du navigateur dans la CI, tableau de bord de ventes pour le fournisseur,
+   pagination des commandes (l'API renvoie les 100 dernières).
 2. **Prestataire SMS** : implémenter `SmsProvider` (`backend/src/auth/sms.provider.ts`).
 3. **Agrégateur de paiement** (Wave, Orange Money, MTN MoMo) : session de paiement dans `PaymentsService.initiate`,
    signature réelle dans `verifySignature`.

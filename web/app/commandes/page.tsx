@@ -1,10 +1,12 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { Cylinder } from '@/components/Cylinder';
 import { Guard } from '@/components/Shell';
-import { Empty, Loading, Notice, StatusBadge } from '@/components/ui';
+import { Empty, Loading, Notice, PageHead, StatusBadge } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
 import { dateTime, fcfa } from '@/lib/format';
+import { brandColor } from '@/lib/media';
 import { Order } from '@/lib/types';
 
 function Orders() {
@@ -14,7 +16,7 @@ function Orders() {
 
   return (
     <div className="stack-lg">
-      <h1>Mes commandes</h1>
+      <PageHead title="Mes commandes" />
       {error && <Notice kind="error">{error}</Notice>}
       {!orders && !error && <Loading />}
       {orders?.length === 0 && (
@@ -24,24 +26,30 @@ function Orders() {
       )}
       {orders && orders.length > 0 && (
         <div className="rows">
-          {orders.map((o) => (
-            <Link key={o.id} href={`/commandes/${o.id}`} className="stack-sm" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
-              <span className="split">
-                <strong>{o.store.name}</strong>
-                <span className="num" style={{ fontSize: '1.4rem' }}>{fcfa(o.total)}</span>
-              </span>
-              <span className="small muted" style={{ display: 'block' }}>
-                {o.items.map((i) => `${i.quantity} × ${i.product.brand.name} ${i.product.cylinderType.label}`).join(', ')}
-              </span>
-              <span className="split small">
-                <StatusBadge status={o.status} />
-                <span className="muted">{o.code}, {dateTime(o.createdAt)}</span>
-              </span>
-            </Link>
-          ))}
+          {orders.map((o) => {
+            const first = o.items[0];
+            return (
+              <Link key={o.id} href={`/commandes/${o.id}`} className="card offer">
+                <span className="offer-media">
+                  {first && <Cylinder kg={first.product.cylinderType.capacityKg} color={brandColor(first.product.brand.name)} scale={first.product.cylinderType.capacityKg >= 12 ? 0.65 : 0.8} />}
+                </span>
+                <span className="stack-sm" style={{ minWidth: 0 }}>
+                  <span className="offer-title" style={{ display: 'block' }}>
+                    {o.items.map((i) => `${i.quantity} × ${i.product.brand.name} ${i.product.cylinderType.label}`).join(', ')}
+                  </span>
+                  <span className="meta">
+                    <span>{o.store.name}</span><span>{dateTime(o.createdAt)}</span>
+                    {o.checkout && <span>Panier #{o.checkout.code}</span>}
+                  </span>
+                  <StatusBadge status={o.status} />
+                </span>
+                <span className="offer-price"><span className="num big price">{fcfa(o.total)}</span></span>
+              </Link>
+            );
+          })}
         </div>
       )}
-      <Link href="/" className="btn btn-quiet">Trouver du gaz</Link>
+      <Link href="/" className="btn btn-quiet btn-block">Trouver du gaz</Link>
     </div>
   );
 }

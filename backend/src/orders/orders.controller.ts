@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { Role, User } from '@prisma/client';
 import { CurrentUser, Roles } from '../common/decorators';
-import { AdminCancelDto, CompleteOrderDto, CreateOrderDto, ListOrdersQuery, RejectOrderDto } from './orders.dto';
+import { AdminCancelDto, CompleteOrderDto, CreateCheckoutDto, CreateOrderDto, ListOrdersQuery, RejectOrderDto } from './orders.dto';
 import { OrdersService } from './orders.service';
 
 @Controller()
@@ -11,6 +11,17 @@ export class OrdersController {
   @Roles(Role.CLIENT) @Post('orders')
   create(@CurrentUser() user: User, @Body() dto: CreateOrderDto) {
     return this.orders.create(user, dto);
+  }
+
+  /** Panier multi-dépôts : crée une commande par dépôt, ensemble ou pas du tout. */
+  @Roles(Role.CLIENT) @Post('checkouts')
+  checkout(@CurrentUser() user: User, @Body() dto: CreateCheckoutDto) {
+    return this.orders.checkout(user, dto);
+  }
+
+  @Roles(Role.CLIENT) @Get('checkouts/:id')
+  getCheckout(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.orders.getCheckout(user, id);
   }
 
   @Get('orders')

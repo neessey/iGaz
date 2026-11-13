@@ -1,223 +1,146 @@
 'use client';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Cylinder } from '@/components/Cylinder';
-import { Field, Loading, Notice } from '@/components/ui';
+import { Icon } from '@/components/Icon';
+import { Loading, Notice } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
+import { useCart } from '@/lib/cart';
 import { fcfa, phoneFmt } from '@/lib/format';
+import { brandColor, IMAGES } from '@/lib/media';
 import { useSession } from '@/lib/session';
-import { Address, Offer, Zone } from '@/lib/types';
+import { Offer } from '@/lib/types';
 
-function OrderForm() {
+function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const params = useSearchParams();
-  const { user, ready } = useSession();
+  const { user } = useSession();
+  const cart = useCart();
 
   const [offer, setOffer] = useState<Offer | null>(null);
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [addresses, setAddresses] = useState<Address[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  const [kind, setKind] = useState<'PURCHASE' | 'EXCHANGE'>('EXCHANGE');
+  const [kind, setKind] = useState<'PURCHASE' | 'EXCHANGE'>(params.get('kind') === 'PURCHASE' ? 'PURCHASE' : 'EXCHANGE');
   const [hasEmpty, setHasEmpty] = useState(false);
   const [qty, setQty] = useState(1);
-  const [fulfillment, setFulfillment] = useState<'DELIVERY' | 'PICKUP'>(params.get('mode') === 'PICKUP' ? 'PICKUP' : 'DELIVERY');
-  const [payment, setPayment] = useState<'MOBILE_MONEY' | 'CASH_ON_DELIVERY'>('MOBILE_MONEY');
-  const [addressChoice, setAddressChoice] = useState('new');
-  const [newZone, setNewZone] = useState('');
-  const [newDetails, setNewDetails] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [added, setAdded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api<Offer>(`/products/${id}`).then(setOffer).catch((e) => setLoadError(errorText(e)));
-    api<Zone[]>('/catalog/zones').then(setZones).catch(() => undefined);
   }, [id]);
 
-  useEffect(() => {
-    if (user?.role === 'CLIENT') api<Address[]>('/addresses').then(setAddresses).catch(() => undefined);
-  }, [user]);
-
-  const store = offer?.store;
-  const servedZones = useMemo(
-    () => zones.filter((z) => store?.areas?.some((a) => a.zoneId === z.id)),
-    [zones, store],
-  );
-  const usable = addresses.filter((a) => servedZones.some((z) => z.id === a.zoneId));
-
-  useEffect(() => {
-    if (!store) return;
-    if (!store.offersDelivery) setFulfillment('PICKUP');
-    else if (!store.offersPickup) setFulfillment('DELIVERY');
-  }, [store]);
-
-  useEffect(() => {
-    setAddressChoice(usable[0]?.id ?? 'new');
-    if (!newZone && servedZones[0]) setNewZone(servedZones[0].id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addresses.length, servedZones.length]);
-
   if (loadError) return <div className="stack"><Notice kind="error">{loadError}</Notice><Link href="/" className="btn btn-quiet">Retour à la recherche</Link></div>;
-  if (!offer || !store) return <Loading />;
+  if (!offer) return <Loading />;
 
+  const store = offer.store;
   const stock = offer.inventory?.quantity ?? 0;
-  const unit = kind === 'EXCHANGE' ? offer.exchangePrice : offer.purchasePrice;
-  const fee = fulfillment === 'DELIVERY' ? store.deliveryFee : 0;
-  const total = unit * qty + fee;
   const maxQty = Math.min(stock, 10);
-  const canOrder = offer.available !== false && (kind === 'PURCHASE' || hasEmpty) &&
-    (fulfillment === 'PICKUP' || addressChoice !== 'new' || newDetails.trim().length >= 3);
+  const unit = kind === 'EXCHANGE' ? offer.exchangePrice : offer.purchasePrice;
+  const name = `${offer.brand.name} ${offer.cylinderType.label}`;
+  const low = stock <= 3;
+  const notClient = !!user && user.role !== 'CLIENT';
+  const canAdd = offer.available !== false && maxQty > 0 && (kind === 'PURCHASE' || hasEmpty) && !notClient;
 
-  async function submit() {
-    if (!offer || !store) return;
-    setBusy(true); setError(null);
-    try {
-      let addressId: string | undefined;
-      if (fulfillment === 'DELIVERY') {
-        if (addressChoice === 'new') {
-          const a = await api<Address>('/addresses', { body: { zoneId: newZone, details: newDetails.trim() } });
-          addressId = a.id;
-        } else addressId = addressChoice;
-      }
-      const order = await api<{ id: string }>('/orders', {
-        body: {
-          storeId: store.id, fulfillment, paymentMethod: payment, addressId,
-          items: [{
-            productId: offer.id, kind, quantity: qty,
-            ...(kind === 'EXCHANGE' ? { returnedBrandId: offer.brandId, returnedCylinderTypeId: offer.cylinderTypeId } : {}),
-          }],
-        },
-      });
-      router.push(`/commandes/${order.id}`);
-    } catch (e) {
-      setError(errorText(e));
-      setBusy(false);
-    }
+  function addToCart(): boolean {
+    if (!offer) return false;
+    setError(null);
+    const problem = cart.add({
+      productId: offer.id, kind, quantity: qty, unitPrice: unit, maxQty,
+      brandId: offer.brandId, brandName: offer.brand.name,
+      cylinderTypeId: offer.cylinderTypeId, label: offer.cylinderType.label, capacityKg: offer.cylinderType.capacityKg,
+      storeId: offer.store.id, storeName: offer.store.name,
+    });
+    if (problem) { setError(problem); return false; }
+    setAdded(true);
+    return true;
   }
 
-  const name = `${offer.brand.name} ${offer.cylinderType.label}`;
+  const modes = [
+    store.offersDelivery && `Livraison${store.deliveryFee > 0 ? ` (${fcfa(store.deliveryFee)})` : ' gratuite'}`,
+    store.offersPickup && 'Retrait au dépôt',
+  ].filter(Boolean).join(' · ');
 
   return (
     <div className="stack-lg">
-      <Link href="/" className="small">Retour aux dépôts</Link>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr', gap: 16, alignItems: 'center' }}>
-        <span className="cyl-slot" style={{ height: 100, color: 'var(--enamel)' }}><Cylinder kg={offer.cylinderType.capacityKg} /></span>
-        <div className="stack-sm">
-          <h1>{name}</h1>
-          <p>{store.name}, {store.address}</p>
-          <p className="small muted">Ouvert de {store.opensAt} à {store.closesAt}. Tél. {phoneFmt(store.phone)}</p>
-        </div>
+      <div className="product-hero">
+        <Link href="/" className="back" aria-label="Retour aux dépôts"><Icon name="back" size={20} /></Link>
+        {IMAGES.productHero && <img src={IMAGES.productHero} alt="" />}
+        <span style={{ position: 'relative', marginBottom: 36 }}>
+          <Cylinder kg={offer.cylinderType.capacityKg} color={brandColor(offer.brand.name)} scale={offer.cylinderType.capacityKg >= 12 ? 1.9 : 2.3} />
+        </span>
       </div>
 
-      {offer.available === false && <Notice kind="error">Ce dépôt est fermé ou n’a plus de stock pour le moment.</Notice>}
-
-      {ready && !user && (
-        <div className="panel panel-warn stack-sm">
-          <h3>Connectez-vous pour commander</h3>
-          <p className="muted">Un code par SMS suffit, sans mot de passe.</p>
-          <Link className="btn" href={`/connexion?next=${encodeURIComponent(`/produit/${id}?mode=${fulfillment}`)}`}>Se connecter</Link>
+      <section className="card product-card stack">
+        <div className="stack-sm">
+          <h1 style={{ fontSize: '1.5rem' }}>{name}</h1>
+          <p className="meta"><span><Icon name="store" size={15} />Livré par <strong style={{ color: 'var(--ink)' }}>{store.name}</strong></span></p>
+          <p className="meta">
+            <span><Icon name="pin" size={15} />{store.address}</span>
+            <span><Icon name="clock" size={15} />{store.opensAt} à {store.closesAt}</span>
+          </p>
         </div>
-      )}
-      {user && user.role !== 'CLIENT' && <Notice>Seuls les comptes clients peuvent commander.</Notice>}
 
-      <section className="stack-sm" aria-labelledby="kind">
-        <h2 id="kind" className="small" style={{ fontFamily: 'var(--font-body)', fontWeight: 700 }}>Votre commande</h2>
-        <div className="segmented" role="radiogroup" aria-labelledby="kind">
-          <button role="radio" aria-checked={kind === 'EXCHANGE'} onClick={() => setKind('EXCHANGE')}>
-            J’échange ma vide<br /><span className="num">{fcfa(offer.exchangePrice)}</span>
+        <div className="choice-grid" role="radiogroup" aria-label="Achat ou échange">
+          <button className="choice" role="radio" aria-checked={kind === 'PURCHASE'} onClick={() => { setKind('PURCHASE'); setAdded(false); }}>
+            <span className="choice-label">Achat simple</span>
+            <span className="choice-value num">{fcfa(offer.purchasePrice)}</span>
           </button>
-          <button role="radio" aria-checked={kind === 'PURCHASE'} onClick={() => setKind('PURCHASE')}>
-            J’achète sans vide<br /><span className="num">{fcfa(offer.purchasePrice)}</span>
+          <button className="choice" role="radio" aria-checked={kind === 'EXCHANGE'} onClick={() => { setKind('EXCHANGE'); setAdded(false); }}>
+            <span className="choice-label">Échange</span>
+            <span className="choice-value num">{fcfa(offer.exchangePrice)}</span>
           </button>
         </div>
+
         {kind === 'EXCHANGE' && (
-          <label className="panel panel-flag" style={{ display: 'flex', gap: 12, alignItems: 'flex-start', cursor: 'pointer' }}>
-            <input type="checkbox" checked={hasEmpty} onChange={(e) => setHasEmpty(e.target.checked)} style={{ width: 26, height: 26, marginTop: 2, accentColor: '#0c6b58' }} />
+          <label className="panel panel-flag check-row">
+            <input type="checkbox" checked={hasEmpty} onChange={(e) => setHasEmpty(e.target.checked)} />
             <span>
               J’ai une bouteille vide <strong>{name}</strong> à remettre.
-              <span className="small muted" style={{ display: 'block' }}>
-                L’échange est refusé si la marque ou la taille est différente.
-              </span>
+              <span className="small muted" style={{ display: 'block' }}>L’échange est refusé si la marque ou la taille est différente.</span>
             </span>
           </label>
         )}
-        <div className="cluster" style={{ marginTop: 6 }}>
-          <span className="stepper">
-            <button aria-label="Une bouteille de moins" onClick={() => setQty((q) => Math.max(1, q - 1))}>−</button>
-            <output aria-live="polite">{qty}</output>
-            <button aria-label="Une bouteille de plus" onClick={() => setQty((q) => Math.min(maxQty, q + 1))}>+</button>
-          </span>
-          <span className="small muted">{stock} en stock</span>
+
+        <div className="split">
+          <span className={`stock-dot${low ? ' low' : ''}`}>{offer.available === false ? 'Indisponible' : low ? `Plus que ${stock} en stock` : 'Stock disponible'}</span>
+          <a className="link-more" href={`tel:${store.phone}`}><Icon name="phone" size={16} />{phoneFmt(store.phone)}</a>
         </div>
+        <p className="meta"><span><Icon name="truck" size={15} />{modes}</span></p>
       </section>
 
-      <section className="stack-sm" aria-labelledby="mode">
-        <h2 id="mode" className="small" style={{ fontFamily: 'var(--font-body)', fontWeight: 700 }}>Réception</h2>
-        <div className="segmented" role="radiogroup" aria-labelledby="mode">
-          <button role="radio" aria-checked={fulfillment === 'DELIVERY'} disabled={!store.offersDelivery} onClick={() => setFulfillment('DELIVERY')}>Livraison</button>
-          <button role="radio" aria-checked={fulfillment === 'PICKUP'} disabled={!store.offersPickup} onClick={() => setFulfillment('PICKUP')}>Retrait au dépôt</button>
-        </div>
-        {fulfillment === 'DELIVERY' && user?.role === 'CLIENT' && (
-          <div className="stack-sm" style={{ marginTop: 10 }}>
-            {usable.map((a) => (
-              <label key={a.id} className="panel" style={{ display: 'flex', gap: 12, cursor: 'pointer' }}>
-                <input type="radio" name="addr" checked={addressChoice === a.id} onChange={() => setAddressChoice(a.id)} style={{ width: 22, height: 22, accentColor: '#0c6b58' }} />
-                <span><strong>{a.zone.name}</strong><span className="small muted" style={{ display: 'block' }}>{a.details}</span></span>
-              </label>
-            ))}
-            {usable.length > 0 && (
-              <label className="panel" style={{ display: 'flex', gap: 12, cursor: 'pointer' }}>
-                <input type="radio" name="addr" checked={addressChoice === 'new'} onChange={() => setAddressChoice('new')} style={{ width: 22, height: 22, accentColor: '#0c6b58' }} />
-                <span>Livrer à une autre adresse</span>
-              </label>
-            )}
-            {addressChoice === 'new' && (
-              <div className="stack-sm">
-                <Field label="Commune" hint={`Ce dépôt livre à ${servedZones.map((z) => z.name).join(', ')}.`}>
-                  <select className="input" value={newZone} onChange={(e) => setNewZone(e.target.value)}>
-                    {servedZones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
-                  </select>
-                </Field>
-                <Field label="Adresse et repères pour le livreur">
-                  <textarea className="input" value={newDetails} onChange={(e) => setNewDetails(e.target.value)} placeholder="Quartier, rue, immeuble, repère connu" />
-                </Field>
-              </div>
-            )}
-          </div>
-        )}
-        {fulfillment === 'PICKUP' && <p className="small muted">Vous retirez la bouteille à {store.address}. Un code vous sera donné pour la remise.</p>}
-      </section>
-
-      <section className="stack-sm" aria-labelledby="pay">
-        <h2 id="pay" className="small" style={{ fontFamily: 'var(--font-body)', fontWeight: 700 }}>Paiement</h2>
-        <div className="segmented" role="radiogroup" aria-labelledby="pay">
-          <button role="radio" aria-checked={payment === 'MOBILE_MONEY'} onClick={() => setPayment('MOBILE_MONEY')}>Mobile money</button>
-          <button role="radio" aria-checked={payment === 'CASH_ON_DELIVERY'} onClick={() => setPayment('CASH_ON_DELIVERY')}>
-            {fulfillment === 'DELIVERY' ? 'À la livraison' : 'Sur place'}
-          </button>
-        </div>
-      </section>
-
-      <section className="panel stack-sm" aria-label="Récapitulatif">
-        <dl className="facts">
-          <dt>{qty} × {kind === 'EXCHANGE' ? 'échange' : 'achat'} {name}</dt><dd className="num">{fcfa(unit * qty)}</dd>
-          {fulfillment === 'DELIVERY' && (<><dt>Livraison</dt><dd className="num">{fee > 0 ? fcfa(fee) : 'Gratuite'}</dd></>)}
-          <dt className="total">Total</dt><dd className="total num" style={{ fontSize: '1.8rem' }}>{fcfa(total)}</dd>
-        </dl>
-      </section>
-
+      {offer.available === false && <Notice kind="error">Ce dépôt est fermé ou n’a plus de stock pour le moment.</Notice>}
+      {notClient && <Notice>Seuls les comptes clients peuvent commander.</Notice>}
+      {kind === 'EXCHANGE' && !hasEmpty && <p className="small muted">Cochez la case de l’échange pour confirmer que vous avez une bouteille vide à remettre.</p>}
       {error && <Notice kind="error">{error}</Notice>}
-      <button className="btn btn-block" disabled={busy || !canOrder || user?.role !== 'CLIENT'} onClick={submit}>
-        {busy ? 'Envoi…' : 'Commander'}
+      {added && (
+        <div className="panel panel-ok split" role="status">
+          <span><strong>Ajouté au panier.</strong> Vous pouvez ajouter des bouteilles d’autres dépôts.</span>
+          <Link className="link-more" href="/">Continuer mes achats</Link>
+        </div>
+      )}
+
+      <button className="btn btn-quiet btn-block" disabled={!canAdd} onClick={() => { if (addToCart()) router.push('/panier'); }}>
+        Commander maintenant
       </button>
-      {kind === 'EXCHANGE' && !hasEmpty && <p className="small muted">Cochez la case pour confirmer que vous avez une bouteille vide à remettre.</p>}
+
+      <div className="sticky-cta">
+        <span className="stepper">
+          <button aria-label="Une bouteille de moins" onClick={() => { setQty((q) => Math.max(1, q - 1)); setAdded(false); }}>−</button>
+          <output aria-live="polite">{qty}</output>
+          <button aria-label="Une bouteille de plus" onClick={() => { setQty((q) => Math.min(Math.max(maxQty, 1), q + 1)); setAdded(false); }}>+</button>
+        </span>
+        {added ? (
+          <Link className="btn" href="/panier"><Icon name="cart" size={20} />Voir le panier ({cart.count})</Link>
+        ) : (
+          <button className="btn" disabled={!canAdd} onClick={addToCart}>Ajouter · {fcfa(unit * qty)}</button>
+        )}
+      </div>
     </div>
   );
 }
 
 export default function Page() {
-  return <Suspense><OrderForm /></Suspense>;
+  return <Suspense><ProductPage /></Suspense>;
 }

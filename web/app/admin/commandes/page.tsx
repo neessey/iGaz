@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { Guard } from '@/components/Shell';
-import { Empty, Loading, Notice, StatusBadge } from '@/components/ui';
+import { Empty, Loading, Notice, PageHead, StatusBadge } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
 import { dateTime, fcfa, phoneFmt, STATUS_LABEL } from '@/lib/format';
 import { Order, OrderStatus } from '@/lib/types';
@@ -13,7 +13,8 @@ function OrderRow({ order, onChange }: { order: Order; onChange: () => void }) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const paid = order.payments.some((p) => p.status === 'SUCCEEDED' && p.method === 'MOBILE_MONEY');
+  // Payée en ligne, y compris par le paiement unique d'un panier multi-dépôts.
+  const paid = order.paidOnline ?? order.payments.some((p) => p.status === 'SUCCEEDED' && p.method === 'MOBILE_MONEY');
 
   async function cancel() {
     setBusy(true); setError(null);
@@ -22,15 +23,15 @@ function OrderRow({ order, onChange }: { order: Order; onChange: () => void }) {
   }
 
   return (
-    <article className="stack-sm">
+    <article className="card stack-sm">
       <div className="split">
-        <strong className="num" style={{ fontSize: '1.2rem' }}>{order.code}</strong>
+        <strong className="num" style={{ fontSize: '1.1rem' }}>#{order.code}</strong>
         <StatusBadge status={order.status} />
       </div>
       <p className="small">
         {order.store.name}, client {order.client ? phoneFmt(order.client.phone) : ''}. {order.items.map((i) => `${i.quantity} × ${i.product.brand.name} ${i.product.cylinderType.label}`).join(', ')}.
       </p>
-      <p className="small"><span className="num" style={{ fontSize: '1.1rem' }}>{fcfa(order.total)}</span> <span className="muted">{dateTime(order.createdAt)}</span></p>
+      <p className="small"><span className="num price" style={{ fontSize: '1.1rem' }}>{fcfa(order.total)}</span> <span className="muted">{dateTime(order.createdAt)}</span></p>
       {paid && ['CANCELLED', 'REJECTED'].includes(order.status) && (
         <Notice>Paiement mobile money reçu : remboursement à traiter à la main.</Notice>
       )}
@@ -65,7 +66,7 @@ function Orders() {
 
   return (
     <div className="stack-lg">
-      <h1>Commandes</h1>
+      <PageHead title="Commandes" back="/admin" />
       <label className="field" style={{ maxWidth: 320 }}>
         <span className="label">Filtrer par statut</span>
         <select className="input" value={status} onChange={(e) => setStatus(e.target.value as OrderStatus | '')}>

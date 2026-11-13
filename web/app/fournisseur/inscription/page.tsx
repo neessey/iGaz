@@ -2,7 +2,7 @@
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 import { Guard } from '@/components/Shell';
-import { Field, Notice } from '@/components/ui';
+import { Field, Notice, PageHead } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
 import { useSession } from '@/lib/session';
 
@@ -29,10 +29,10 @@ function Register() {
   return (
     <div className="stack-lg">
       <div className="stack-sm">
-        <h1>Ouvrir ma boutique</h1>
+        <PageHead title="Ouvrir ma boutique" back="/profil" />
         <p className="muted">Vous vendez ou livrez des bouteilles de gaz à Abidjan&nbsp;? Dites-nous qui vous êtes. Notre équipe valide votre demande avant que vos produits n’apparaissent.</p>
       </div>
-      <form className="stack" onSubmit={submit}>
+      <form className="card stack" onSubmit={submit}>
         <Field label="Nom de votre dépôt ou de votre société">
           <input className="input" value={businessName} onChange={(e) => setBusinessName(e.target.value)} required minLength={2} />
         </Field>

@@ -42,6 +42,7 @@ Les tests e2e rejouent le parcours complet sur une vraie base PostgreSQL : appli
 | Produits et stock | Prix d'achat / d'échange par boutique, stock avec journal des mouvements, correction admin justifiée |
 | Recherche publique | Uniquement les offres commandables : stock > 0, fournisseur validé, boutique ouverte, mode et zone desservis |
 | Commandes | Achat ou échange, livraison ou retrait, prix figés, un fournisseur par commande |
+| Panier multi-dépôts | `POST /checkouts` : jusqu'à 3 dépôts, une commande par dépôt créées ensemble ou pas du tout (le refus nomme le dépôt) ; `GET /checkouts/:id` ; `POST /checkouts/:id/payments` : un seul paiement mobile money pour les commandes encore à payer |
 | Cycle de vie | `PENDING_PAYMENT → SUBMITTED → ACCEPTED → READY_FOR_PICKUP / OUT_FOR_DELIVERY → COMPLETED` (+ refus, annulations) |
 | Paiement | Mobile money par webhook signé (HMAC), idempotent ; paiement à la livraison plafonné |
 
@@ -52,11 +53,14 @@ commandes simultanées) · stock restitué en cas d'annulation admin · échange
 clôture uniquement avec le code de confirmation du client · paiement jamais confirmé sans webhook signé · double clic de
 paiement = une seule transaction · changement de prix sans effet sur les commandes validées · un fournisseur n'accède
 jamais aux commandes ni aux boutiques d'un autre · toute action admin laisse une trace dans `AuditLog`.
+Panier : 3 dépôts au plus · tout ou rien si un dépôt est en défaut · le dépôt ne voit ni le panier ni les autres
+commandes · un paiement unique fait passer toutes les commandes, rejeu sans effet · une commande annulée avant le
+paiement n'est pas facturée · un refus de dépôt n'affecte pas les autres (part payée signalée pour remboursement).
 
 ## À brancher ou à décider avant la mise en production
 
 - **Prestataire SMS** (OTP) : implémenter `SmsProvider`.
-- **Agrégateur de paiement** : `PaymentsService.initiate` doit créer la session de paiement (`checkoutUrl`), et
+- **Agrégateur de paiement** : `PaymentsService.startPayment` (commande directe et panier) doit créer la session de paiement (`checkoutUrl`), et
   `verifySignature` doit suivre le schéma de signature réel du prestataire (le HMAC actuel est un schéma générique).
 - **Remboursements** : aucun remboursement automatique. Les commandes annulées après paiement sont signalées dans
   `OrderEvent` pour traitement manuel par l'administration.

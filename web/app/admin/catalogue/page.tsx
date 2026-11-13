@@ -1,7 +1,7 @@
 'use client';
 import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react';
 import { Guard } from '@/components/Shell';
-import { Loading, Notice } from '@/components/ui';
+import { Loading, Notice, PageHead } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
 import { Brand, Cylinder, Zone } from '@/lib/types';
 
@@ -20,9 +20,9 @@ function Section<T extends { id: string; isActive: boolean }>({
   }
 
   return (
-    <section className="stack-sm" aria-label={title}>
+    <section className="card stack-sm" aria-label={title}>
       <h2>{title}</h2>
-      <div className="rows">
+      <div className="rows-flat">
         {items.map((i) => (
           <div key={i.id} className="split" style={{ opacity: i.isActive ? 1 : 0.55 }}>
             <strong>{label(i)}{i.isActive ? '' : ' (désactivé)'}</strong>
@@ -62,7 +62,7 @@ function Catalog() {
   return (
     <div className="stack-lg">
       <div className="stack-sm">
-        <h1>Catalogue central</h1>
+        <PageHead title="Catalogue central" back="/admin" />
         <p className="muted">Les fournisseurs ne peuvent publier que les marques et tailles listées ici.</p>
       </div>
 

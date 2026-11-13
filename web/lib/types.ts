@@ -25,5 +25,14 @@ export interface Order {
     product: { brand: Brand; cylinderType: Cylinder } }[];
   events: { id: string; status: OrderStatus; note: string | null; createdAt: string }[];
   payments: { id: string; method: string; amount: number; status: string }[];
+  /** Payée en ligne (paiement propre ou paiement du panier). */
+  paidOnline?: boolean;
+  /** Panier multi-dépôts d'origine (visible par le client et l'admin seulement). */
+  checkout?: { id: string; code: string } | null;
+}
+export interface Checkout {
+  id: string; code: string; paymentMethod: 'MOBILE_MONEY' | 'CASH_ON_DELIVERY'; total: number; createdAt: string;
+  orders: Order[];
+  payments: { id: string; method: string; amount: number; status: string }[];
 }
 export interface Address { id: string; zoneId: string; label: string; details: string; zone: Zone }

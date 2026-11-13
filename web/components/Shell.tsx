@@ -2,64 +2,106 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect } from 'react';
+import { useCart } from '@/lib/cart';
 import { useSession } from '@/lib/session';
 import { Role } from '@/lib/types';
+import { Icon, IconName } from './Icon';
+import { Logo } from './Logo';
+import { OfflineNotice, ServiceWorker } from './Pwa';
 import { Loading } from './ui';
 
-const NAV: Record<Role, { href: string; label: string }[]> = {
-  CLIENT: [
-    { href: '/', label: 'Trouver du gaz' },
-    { href: '/commandes', label: 'Mes commandes' },
-  ],
+type Tab = { href: string; label: string; icon: IconName };
+
+const GUEST: Tab[] = [
+  { href: '/', label: 'Accueil', icon: 'home' },
+  { href: '/panier', label: 'Panier', icon: 'cart' },
+  { href: '/commandes', label: 'Commandes', icon: 'orders' },
+  { href: '/profil', label: 'Profil', icon: 'user' },
+];
+
+const TABS: Record<Role, Tab[]> = {
+  CLIENT: GUEST,
   SUPPLIER: [
-    { href: '/fournisseur', label: 'Commandes' },
-    { href: '/fournisseur/stock', label: 'Stock' },
-    { href: '/fournisseur/boutique', label: 'Ma boutique' },
+    { href: '/fournisseur', label: 'Accueil', icon: 'home' },
+    { href: '/fournisseur/stock', label: 'Stock', icon: 'box' },
+    { href: '/fournisseur/boutique', label: 'Boutique', icon: 'store' },
+    { href: '/profil', label: 'Profil', icon: 'user' },
   ],
   ADMIN: [
-    { href: '/admin', label: 'Aperçu' },
-    { href: '/admin/catalogue', label: 'Catalogue' },
-    { href: '/admin/commandes', label: 'Commandes' },
-    { href: '/admin/audit', label: 'Journal' },
+    { href: '/admin', label: 'Tableau', icon: 'grid' },
+    { href: '/admin/catalogue', label: 'Catalogue', icon: 'tag' },
+    { href: '/admin/commandes', label: 'Commandes', icon: 'orders' },
+    { href: '/admin/audit', label: 'Journal', icon: 'journal' },
+    { href: '/profil', label: 'Profil', icon: 'user' },
   ],
 };
 
+/** Pages plein écran, sans en-tête ni barre d'onglets. */
+const BARE = ['/connexion'];
+
 export function Shell({ children }: { children: ReactNode }) {
-  const { user, signOut } = useSession();
+  const { user } = useSession();
+  const cart = useCart();
   const pathname = usePathname();
-  const router = useRouter();
-  const links = user ? NAV[user.role] : [{ href: '/', label: 'Trouver du gaz' }];
-  const current = [...links].sort((a, b) => b.href.length - a.href.length).find(
-    (l) => pathname === l.href || (l.href !== '/' && pathname.startsWith(l.href)),
+  const tabs = user ? TABS[user.role] : GUEST;
+  const current = [...tabs].sort((a, b) => b.href.length - a.href.length).find(
+    (t) => pathname === t.href || (t.href !== '/' && pathname.startsWith(t.href)),
   );
+
+  if (BARE.includes(pathname)) return <>{children}<ServiceWorker /></>;
+
+  // Les espaces fournisseur et admin affichent leur propre en-tête violet ; le client garde une barre légère.
+  const ownHeader = pathname.startsWith('/fournisseur') || pathname.startsWith('/admin') || pathname.startsWith('/produit/');
 
   return (
     <>
-      <header>
-        <div className="topbar">
-          <div className="topbar-in">
-            <Link href="/" className="wordmark">i<span>Gaz</span></Link>
-            {user ? (
-              <button className="who" onClick={() => { signOut(); router.push('/'); }}>
-                Se déconnecter
-              </button>
-            ) : (
-              <Link className="who" href="/connexion">Se connecter</Link>
-            )}
+      {!ownHeader && (
+        <header className="appbar">
+          <div className="appbar-in">
+            <Logo size={36} />
+            {!user && <Link className="pill-link" href="/connexion">Se connecter</Link>}
           </div>
+        </header>
+      )}
+      <main className="page">
+        <OfflineNotice />
+        {children}
+      </main>
+      <nav className="tabbar" aria-label="Navigation principale">
+        <div className="tabbar-in">
+          {tabs.map((t) => (
+            <Link key={t.href} href={t.href} aria-current={current?.href === t.href ? 'page' : undefined}
+              aria-label={t.href === '/panier' && cart.count > 0 ? `Panier, ${cart.count} article${cart.count > 1 ? 's' : ''}` : undefined}>
+              <span className="tab-icon">
+                <Icon name={t.icon} size={22} />
+                {t.href === '/panier' && cart.count > 0 && <span className="tab-badge" aria-hidden="true">{cart.count > 99 ? '99+' : cart.count}</span>}
+              </span>
+              {t.label}
+            </Link>
+          ))}
         </div>
-        <nav className="nav" aria-label="Navigation principale">
-          <div className="nav-in">
-            {links.map((l) => (
-              <Link key={l.href} href={l.href} aria-current={current?.href === l.href ? 'page' : undefined}>
-                {l.label}
-              </Link>
-            ))}
-          </div>
-        </nav>
-      </header>
-      <main className="page">{children}</main>
+      </nav>
+      <ServiceWorker />
     </>
+  );
+}
+
+/**
+ * En-tête violet des espaces fournisseur et administration. Placé en haut de la page, il déborde des marges
+ * pour occuper toute la largeur de l'écran.
+ */
+export function HeroHeader({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children?: ReactNode }) {
+  return (
+    <div className="night hero-head" style={{ margin: '-20px -16px 0' }}>
+      <div className="hero-head-in">
+        <div className="split">
+          <Logo light size={32} href={null} />
+        </div>
+        <p className="hero-title" style={{ marginTop: 16 }}>{title}</p>
+        {subtitle && <p className="hero-sub">{subtitle}</p>}
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -78,7 +120,7 @@ export function Guard({ roles, children }: { roles: Role[]; children: ReactNode 
     return (
       <div className="panel panel-stop stack-sm">
         <h2>Cette page n’est pas pour votre compte</h2>
-        <p className="muted">Retournez à l’accueil pour continuer.</p>
+        <p>Retournez à l’accueil pour continuer.</p>
         <Link className="btn btn-quiet" href="/">Aller à l’accueil</Link>
       </div>
     );

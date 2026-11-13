@@ -1,9 +1,10 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Guard } from '@/components/Shell';
-import { Empty, Loading, Notice } from '@/components/ui';
+import { Icon } from '@/components/Icon';
+import { Guard, HeroHeader } from '@/components/Shell';
+import { Empty, Loading, Notice, SectionHead } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
-import { dateTime, fcfa, phoneFmt } from '@/lib/format';
+import { AUDIT_LABEL as ACTION_LABEL, dateTime, fcfa, phoneFmt } from '@/lib/format';
 import { OrderStatus } from '@/lib/types';
 
 interface Stats {
@@ -25,15 +26,22 @@ const SUPPLIER_LABEL: Record<SupplierStatus, string> = {
   PENDING: 'À valider', APPROVED: 'Actifs', SUSPENDED: 'Suspendus', REJECTED: 'Refusés',
 };
 
+interface Log { id: string; action: string; createdAt: string; actor: { phone: string } | null }
+
+/** 1 250 → « 1,3 k » pour les tuiles ; en dessous de 1 000, le nombre exact. */
+const compact = (n: number) => (n >= 1000 ? `${(n / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} k` : String(n));
+
 function Overview() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[] | null>(null);
+  const [logs, setLogs] = useState<Log[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     api<Stats>('/admin/stats').then(setStats).catch((e) => setError(errorText(e)));
     api<Supplier[]>('/admin/suppliers').then(setSuppliers).catch((e) => setError(errorText(e)));
+    api<Log[]>('/admin/audit-logs?limit=4').then(setLogs).catch(() => setLogs([]));
   }, []);
   useEffect(load, [load]);
 
@@ -49,32 +57,57 @@ function Overview() {
   const pending = suppliers.filter((s) => s.status === 'PENDING');
   const others = suppliers.filter((s) => s.status !== 'PENDING');
 
+  const totalOrders = Object.values(stats.orders).reduce((a, b) => a + b, 0);
+  const statusRows = (Object.keys(stats.orders) as OrderStatus[]).filter((k) => stats.orders[k] > 0);
+  const maxStatus = Math.max(1, ...statusRows.map((k) => stats.orders[k]));
+
   return (
     <div className="stack-lg">
-      <h1>Vue d’ensemble</h1>
+      <HeroHeader title="Administration" subtitle="Bonjour ! Voici la vue d’ensemble.">
+        <div className="stats">
+          <div className="stat"><span className="num">{compact(stats.clients)}</span><span className="stat-label">Clients</span></div>
+          <div className="stat"><span className="num">{compact(stats.suppliers.APPROVED ?? 0)}</span><span className="stat-label">Fournisseurs</span></div>
+          <div className="stat"><span className="num">{compact(totalOrders)}</span><span className="stat-label">Commandes</span></div>
+        </div>
+      </HeroHeader>
       {error && <Notice kind="error">{error}</Notice>}
 
-      <section className="stack-sm" aria-labelledby="chiffres">
-        <h2 id="chiffres">Chiffres du moment</h2>
-        <div className="panel">
-          <dl className="facts">
-            <dt>Clients inscrits</dt><dd className="num">{stats.clients}</dd>
-            <dt>Boutiques</dt><dd className="num">{stats.stores}</dd>
-            {(Object.keys(SUPPLIER_LABEL) as SupplierStatus[]).map((k) => (
-              <div key={k} style={{ display: 'contents' }}><dt>Fournisseurs {SUPPLIER_LABEL[k].toLowerCase()}</dt><dd className="num">{stats.suppliers[k] ?? 0}</dd></div>
-            ))}
-            {(Object.keys(stats.orders) as OrderStatus[]).map((k) => (
-              <div key={k} style={{ display: 'contents' }}><dt>Commandes {ORDER_PLURAL[k]}</dt><dd className="num">{stats.orders[k]}</dd></div>
-            ))}
-            <dt className="total">Ventes terminées</dt><dd className="total num">{fcfa(stats.completedVolume)}</dd>
-          </dl>
+      <section className="stack-sm" aria-labelledby="activite">
+        <SectionHead id="activite" title="Activité récente" more={{ href: '/admin/audit' }} />
+        <div className="card rows-flat" style={{ paddingTop: 4, paddingBottom: 4 }}>
+          {logs === null ? <Loading /> : logs.length === 0 ? <p className="muted" style={{ padding: '12px 0' }}>Aucune action pour l’instant.</p> : logs.map((l) => (
+            <div key={l.id} className="activity">
+              <span className="activity-icon"><Icon name={l.action.startsWith('SUPPLIER') ? 'store' : l.action.startsWith('STOCK') ? 'alert' : l.action.startsWith('ORDER') ? 'orders' : 'journal'} size={20} /></span>
+              <span style={{ minWidth: 0 }}>
+                <strong style={{ display: 'block' }}>{ACTION_LABEL[l.action] ?? l.action}</strong>
+                <span className="small muted">{dateTime(l.createdAt)}{l.actor ? `, ${phoneFmt(l.actor.phone)}` : ''}</span>
+              </span>
+              <Icon name="chevron" size={18} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="dark-card stack-sm" aria-label="Ventes et commandes">
+        <span style={{ opacity: 0.85 }}>Ventes terminées</span>
+        <span className="num">{fcfa(stats.completedVolume)}</span>
+        <div className="stack-sm" style={{ marginTop: 10 }}>
+          {statusRows.map((k) => (
+            <div key={k} className="small">
+              <div className="split" style={{ opacity: 0.9 }}><span>Commandes {ORDER_PLURAL[k]}</span><strong>{stats.orders[k]}</strong></div>
+              <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.12)', marginTop: 4 }}>
+                <div style={{ height: 6, borderRadius: 3, width: `${(stats.orders[k] / maxStatus) * 100}%`, background: 'linear-gradient(90deg, #7c5cff, #f7931e)' }} />
+              </div>
+            </div>
+          ))}
+          <p className="small" style={{ opacity: 0.7 }}>{stats.stores} boutiques, {stats.suppliers.PENDING ?? 0} demandes à valider, {stats.suppliers.SUSPENDED ?? 0} fournisseurs suspendus.</p>
         </div>
       </section>
 
       <section className="stack-sm" aria-labelledby="valider">
         <h2 id="valider">Demandes à valider <span className="muted">({pending.length})</span></h2>
         {pending.length === 0 ? <Empty title="Aucune demande en attente" /> : pending.map((s) => (
-          <article key={s.id} className="panel panel-warn stack-sm">
+          <article key={s.id} className="card stack-sm">
             <div className="split"><strong>{s.businessName}</strong><span className="small muted">{dateTime(s.createdAt)}</span></div>
             <p className="small">{s.user.name ?? 'Sans nom'}, {phoneFmt(s.user.phone)}</p>
             {s.documents.length > 0
@@ -92,7 +125,7 @@ function Overview() {
       <section className="stack-sm" aria-labelledby="tous">
         <h2 id="tous">Tous les fournisseurs</h2>
         {others.length === 0 ? <Empty title="Aucun fournisseur pour l’instant" /> : (
-          <div className="rows">
+          <div className="card rows-flat" style={{ paddingTop: 4, paddingBottom: 4 }}>
             {others.map((s) => (
               <div key={s.id} className="split">
                 <span><strong>{s.businessName}</strong><span className="small muted" style={{ display: 'block' }}>{phoneFmt(s.user.phone)}, {SUPPLIER_LABEL[s.status].toLowerCase()}</span></span>

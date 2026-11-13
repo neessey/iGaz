@@ -25,6 +25,26 @@ export class CreateOrderDto {
   items: OrderItemDto[];
 }
 
+/** Une partie du panier : les articles d'un dépôt, qui deviendront une commande. */
+export class CheckoutStoreDto {
+  @IsUUID() storeId: string;
+  @IsEnum(FulfillmentType) fulfillment: FulfillmentType;
+
+  // Panier vide ou plus de 10 articles : refusés par checkoutShapeError, avec un message en français.
+  @IsArray() @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => OrderItemDto)
+  items: OrderItemDto[];
+}
+
+/** Panier multi-dépôts : une adresse et un mode de paiement communs, une commande par dépôt (3 au plus). */
+export class CreateCheckoutDto {
+  @IsEnum(PaymentMethod) paymentMethod: PaymentMethod;
+  @IsOptional() @IsUUID() addressId?: string;
+
+  // La limite de 3 dépôts est vérifiée par checkoutShapeError (message en français).
+  @IsArray() @ArrayMaxSize(20) @ValidateNested({ each: true }) @Type(() => CheckoutStoreDto)
+  stores: CheckoutStoreDto[];
+}
+
 export class RejectOrderDto {
   @IsString() @MinLength(3) @MaxLength(200) reason: string;
 }

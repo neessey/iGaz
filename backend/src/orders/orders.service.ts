@@ -1,15 +1,15 @@
 import {
-  BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException,
+  BadRequestException, ConflictException, HttpException, Injectable, NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OrderStatus, Prisma, User } from '@prisma/client';
+import { OrderStatus, PaymentMethod, Prisma, User } from '@prisma/client';
 import { randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
-import { CreateOrderDto } from './orders.dto';
-import { canTransition, isExchangeCompatible, isStoreOpenNow, STOCK_HELD } from './order-rules';
+import { CreateCheckoutDto, CreateOrderDto } from './orders.dto';
+import { canTransition, checkoutShapeError, isExchangeCompatible, isStoreOpenNow, orderTotals, STOCK_HELD } from './order-rules';
 
 const ORDER_INCLUDE = {
   items: { include: { product: { include: { brand: true, cylinderType: true } } } },
@@ -18,9 +18,17 @@ const ORDER_INCLUDE = {
   // Coordonnées du client : nécessaires au dépôt pour joindre le client à la livraison.
   client: { select: { name: true, phone: true } },
   payments: { select: { id: true, method: true, amount: true, status: true, createdAt: true } },
+  // Panier d'origine : réservé au client et à l'admin (retiré pour le dépôt, voir present()).
+  checkout: { select: { id: true, code: true, payments: { select: { method: true, status: true, createdAt: true } } } },
 } satisfies Prisma.OrderInclude;
 
 type FullOrder = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
+
+/** Payée en ligne : par un paiement propre à la commande ou par celui de son panier. */
+export function paidOnline(order: Pick<FullOrder, 'payments' | 'checkout'>): boolean {
+  const ok = (p: { method: string; status: string }) => p.method === 'MOBILE_MONEY' && p.status === 'SUCCEEDED';
+  return order.payments.some(ok) || !!order.checkout?.payments.some(ok);
+}
 
 @Injectable()
 export class OrdersService {
@@ -31,11 +39,15 @@ export class OrdersService {
     private readonly config: ConfigService,
   ) {}
 
-  /** Le code de confirmation n'est visible que par le client : il le remet au livreur ou au dépôt. */
+  /**
+   * Le code de confirmation n'est visible que par le client : il le remet au livreur ou au dépôt.
+   * Le panier d'origine n'est jamais montré au dépôt : il y verrait les achats du client chez d'autres dépôts.
+   */
   private present(order: FullOrder, viewer: User) {
-    if (order.clientId === viewer.id) return order;
-    const { confirmationCode: _hidden, ...rest } = order;
-    return rest;
+    const view = { ...order, paidOnline: paidOnline(order) };
+    if (order.clientId === viewer.id) return view;
+    const { confirmationCode: _hidden, checkout, ...rest } = view;
+    return viewer.role === 'ADMIN' ? { ...rest, checkout } : rest;
   }
 
   private async load(id: string): Promise<FullOrder> {
@@ -77,7 +89,24 @@ export class OrdersService {
 
   // ---------------------------------------------------------------- création
 
-  async create(user: User, dto: CreateOrderDto) {
+  /** Adresse de livraison du client (la sienne uniquement), si au moins une commande est en livraison. */
+  private async resolveAddress(user: User, needed: boolean, addressId?: string) {
+    if (!needed) return null;
+    if (!addressId) throw new BadRequestException('Une adresse est requise pour la livraison');
+    const address = await this.prisma.address.findFirst({ where: { id: addressId, userId: user.id }, include: { zone: true } });
+    if (!address) throw new BadRequestException('Adresse introuvable');
+    return address;
+  }
+
+  /**
+   * Prépare une commande pour un dépôt, sans rien écrire : dépôt ouvert et validé, mode de remise proposé, zone livrée,
+   * produits actifs du dépôt, stock suffisant, échange compatible, prix figés, plafond du paiement à la livraison.
+   * Utilisée par la commande directe et par le panier multi-dépôts : mêmes règles dans les deux cas.
+   */
+  private async prepare(
+    dto: Pick<CreateOrderDto, 'storeId' | 'fulfillment' | 'items'>, paymentMethod: PaymentMethod,
+    address: { zoneId: string; details: string; zone: { name: string } } | null,
+  ) {
     const store = await this.prisma.store.findUnique({
       where: { id: dto.storeId },
       include: { supplier: true, areas: true },
@@ -96,11 +125,7 @@ export class OrdersService {
     let zoneId: string | null = null;
     let deliveryDetails: string | null = null;
     if (dto.fulfillment === 'DELIVERY') {
-      if (!dto.addressId) throw new BadRequestException('Une adresse est requise pour la livraison');
-      const address = await this.prisma.address.findFirst({
-        where: { id: dto.addressId, userId: user.id }, include: { zone: true },
-      });
-      if (!address) throw new BadRequestException('Adresse introuvable');
+      if (!address) throw new BadRequestException('Une adresse est requise pour la livraison');
       if (!store.areas.some((a) => a.zoneId === address.zoneId)) {
         throw new UnprocessableEntityException("Cette boutique ne livre pas dans votre zone");
       }
@@ -126,7 +151,6 @@ export class OrdersService {
       }
     }
 
-    let subtotal = 0;
     const itemsData = dto.items.map((item) => {
       const p = byId.get(item.productId)!;
       if (item.kind === 'EXCHANGE') {
@@ -137,7 +161,6 @@ export class OrdersService {
         }
       }
       const unitPrice = item.kind === 'EXCHANGE' ? p.exchangePrice : p.purchasePrice;
-      subtotal += unitPrice * item.quantity;
       return {
         productId: p.id, kind: item.kind, quantity: item.quantity, unitPrice,
         returnedBrandId: item.kind === 'EXCHANGE' ? item.returnedBrandId : null,
@@ -145,37 +168,103 @@ export class OrdersService {
       };
     });
 
-    const deliveryFee = dto.fulfillment === 'DELIVERY' ? store.deliveryFee : 0;
-    const total = subtotal + deliveryFee;
+    const { subtotal, deliveryFee, total } = orderTotals(itemsData, dto.fulfillment, store.deliveryFee);
 
-    if (dto.paymentMethod === 'CASH_ON_DELIVERY') {
+    if (paymentMethod === 'CASH_ON_DELIVERY') {
       const cap = Number(this.config.get('COD_MAX_AMOUNT') ?? 100000);
       if (total > cap) {
         throw new UnprocessableEntityException(`Paiement à la livraison limité à ${cap} FCFA`);
       }
     }
 
-    const status: OrderStatus = dto.paymentMethod === 'MOBILE_MONEY' ? 'PENDING_PAYMENT' : 'SUBMITTED';
-    const created = await this.prisma.$transaction(async (tx) => {
-      const order = await tx.order.create({
+    return { store, fulfillment: dto.fulfillment, zoneId, deliveryDetails, subtotal, deliveryFee, total, itemsData };
+  }
+
+  /** Écrit une commande préparée (dans la transaction donnée), avec son paiement en espèces le cas échéant. */
+  private async write(
+    tx: Tx, user: User, prepared: Awaited<ReturnType<OrdersService['prepare']>>, paymentMethod: PaymentMethod, checkoutId?: string,
+  ) {
+    const status: OrderStatus = paymentMethod === 'MOBILE_MONEY' ? 'PENDING_PAYMENT' : 'SUBMITTED';
+    const { store, fulfillment, zoneId, deliveryDetails, subtotal, deliveryFee, total, itemsData } = prepared;
+    const order = await tx.order.create({
+      data: {
+        code: `GZ-${randomBytes(4).toString('hex').toUpperCase()}`,
+        clientId: user.id, storeId: store.id, checkoutId,
+        fulfillment, paymentMethod, status,
+        zoneId, deliveryDetails, subtotal, deliveryFee, total,
+        confirmationCode: String(randomInt(0, 1_000_000)).padStart(6, '0'),
+        items: { create: itemsData },
+        events: { create: { status, actorId: user.id } },
+      },
+    });
+    // Espèces : chaque dépôt encaisse sa propre commande à la remise, même dans un panier.
+    if (paymentMethod === 'CASH_ON_DELIVERY') {
+      await tx.payment.create({
+        data: { orderId: order.id, method: 'CASH_ON_DELIVERY', amount: total, idempotencyKey: `cod:${order.id}` },
+      });
+    }
+    return order;
+  }
+
+  async create(user: User, dto: CreateOrderDto) {
+    const address = await this.resolveAddress(user, dto.fulfillment === 'DELIVERY', dto.addressId);
+    const prepared = await this.prepare(dto, dto.paymentMethod, address);
+    const created = await this.prisma.$transaction((tx) => this.write(tx, user, prepared, dto.paymentMethod));
+    return this.present(await this.load(created.id), user);
+  }
+
+  /**
+   * Panier multi-dépôts : une commande par dépôt, créées ensemble ou pas du tout. Si un dépôt pose problème
+   * (fermé, hors zone, stock…), rien n'est créé et le message nomme le dépôt.
+   */
+  async checkout(user: User, dto: CreateCheckoutDto) {
+    const shape = checkoutShapeError(dto.stores);
+    if (shape) throw new BadRequestException(shape);
+    const address = await this.resolveAddress(user, dto.stores.some((s) => s.fulfillment === 'DELIVERY'), dto.addressId);
+
+    const prepared: Awaited<ReturnType<OrdersService['prepare']>>[] = [];
+    for (const s of dto.stores) {
+      try {
+        prepared.push(await this.prepare(s, dto.paymentMethod, address));
+      } catch (e) {
+        throw await this.namedStoreError(e, s.storeId);
+      }
+    }
+
+    const checkoutId = await this.prisma.$transaction(async (tx) => {
+      const checkout = await tx.checkout.create({
         data: {
-          code: `GZ-${randomBytes(4).toString('hex').toUpperCase()}`,
-          clientId: user.id, storeId: store.id,
-          fulfillment: dto.fulfillment, paymentMethod: dto.paymentMethod, status,
-          zoneId, deliveryDetails, subtotal, deliveryFee, total,
-          confirmationCode: String(randomInt(0, 1_000_000)).padStart(6, '0'),
-          items: { create: itemsData },
-          events: { create: { status, actorId: user.id } },
+          code: `PN-${randomBytes(4).toString('hex').toUpperCase()}`,
+          clientId: user.id, paymentMethod: dto.paymentMethod,
+          total: prepared.reduce((sum, p) => sum + p.total, 0),
         },
       });
-      if (dto.paymentMethod === 'CASH_ON_DELIVERY') {
-        await tx.payment.create({
-          data: { orderId: order.id, method: 'CASH_ON_DELIVERY', amount: total, idempotencyKey: `cod:${order.id}` },
-        });
-      }
-      return order;
+      for (const p of prepared) await this.write(tx, user, p, dto.paymentMethod, checkout.id);
+      return checkout.id;
     });
-    return this.present(await this.load(created.id), user);
+    return this.getCheckout(user, checkoutId);
+  }
+
+  /** Préfixe un refus par le nom du dépôt concerné, pour que le client sache quoi retirer de son panier. */
+  private async namedStoreError(e: unknown, storeId: string) {
+    if (!(e instanceof HttpException)) return e;
+    const store = await this.prisma.store.findUnique({ where: { id: storeId }, select: { name: true } });
+    const message = `${store?.name ?? 'Un dépôt du panier'} : ${e.message}`;
+    return new HttpException({ statusCode: e.getStatus(), message, error: e.name }, e.getStatus());
+  }
+
+  /** Panier du client avec ses commandes (une par dépôt). Introuvable pour tout autre utilisateur. */
+  async getCheckout(user: User, id: string) {
+    const checkout = await this.prisma.checkout.findUnique({
+      where: { id },
+      include: {
+        // Créées dans la même transaction, les commandes ont la même date : on les range par nom de dépôt.
+        orders: { include: ORDER_INCLUDE, orderBy: [{ store: { name: 'asc' } }, { id: 'asc' }] },
+        payments: { select: { id: true, method: true, amount: true, status: true, createdAt: true } },
+      },
+    });
+    if (!checkout || checkout.clientId !== user.id) throw new NotFoundException('Panier introuvable');
+    return { ...checkout, orders: checkout.orders.map((o) => this.present(o, user)) };
   }
 
   // ----------------------------------------------------------------- lecture
@@ -275,7 +364,7 @@ export class OrdersService {
     if (order.status !== 'PENDING_PAYMENT' && order.status !== 'SUBMITTED') {
       throw new ConflictException('La commande est déjà acceptée : contactez le support pour l’annuler');
     }
-    const paid = order.payments.some((p) => p.status === 'SUCCEEDED');
+    const paid = paidOnline(order);
     await this.prisma.$transaction((tx) =>
       this.move(tx, order, 'CANCELLED', user.id,
         paid ? 'Annulée par le client — remboursement à traiter par l’administration' : 'Annulée par le client'));

@@ -1,8 +1,41 @@
 import {
-  canTransition, isExchangeCompatible, isStoreOpenNow, normalizeIvorianPhone, TRANSITIONS,
+  canTransition, checkoutShapeError, isExchangeCompatible, isStoreOpenNow, normalizeIvorianPhone, orderTotals, TRANSITIONS,
 } from './order-rules';
 
 describe('order-rules', () => {
+  describe('panier multi-dépôts', () => {
+    const store = (storeId: string, n = 1) => ({ storeId, items: Array.from({ length: n }, () => ({})) });
+
+    it('accepte de 1 à 3 dépôts distincts', () => {
+      expect(checkoutShapeError([store('a')])).toBeNull();
+      expect(checkoutShapeError([store('a'), store('b'), store('c')])).toBeNull();
+    });
+
+    it('refuse un panier vide ou de plus de 3 dépôts', () => {
+      expect(checkoutShapeError([])).toBe('Le panier est vide');
+      expect(checkoutShapeError([store('a'), store('b'), store('c'), store('d')])).toMatch(/au plus 3 dépôts/);
+    });
+
+    it('refuse un dépôt en double (ses articles doivent former une seule commande)', () => {
+      expect(checkoutShapeError([store('a'), store('a')])).toMatch(/deux fois/);
+    });
+
+    it('refuse un dépôt sans article ou avec plus de 10 articles', () => {
+      expect(checkoutShapeError([store('a', 0)])).toMatch(/aucun article/);
+      expect(checkoutShapeError([store('a', 11)])).toMatch(/Au plus 10 articles/);
+      expect(checkoutShapeError([store('a', 10)])).toBeNull();
+    });
+
+    it('totaux d’une commande : frais de livraison seulement en livraison, montants entiers', () => {
+      const items = [{ unitPrice: 7500, quantity: 1 }, { unitPrice: 1500, quantity: 2 }];
+      expect(orderTotals(items, 'DELIVERY', 500)).toEqual({ subtotal: 10500, deliveryFee: 500, total: 11000 });
+      expect(orderTotals(items, 'PICKUP', 500)).toEqual({ subtotal: 10500, deliveryFee: 0, total: 10500 });
+      // Chaque dépôt facture ses propres frais : deux commandes en livraison = deux frais.
+      const twoStores = orderTotals(items, 'DELIVERY', 500).total + orderTotals([{ unitPrice: 7000, quantity: 1 }], 'DELIVERY', 700).total;
+      expect(twoStores).toBe(11000 + 7700);
+    });
+  });
+
   describe('transitions de commande', () => {
     it('autorise le parcours nominal', () => {
       expect(canTransition('SUBMITTED', 'ACCEPTED')).toBe(true);

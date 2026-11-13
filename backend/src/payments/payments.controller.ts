@@ -17,6 +17,16 @@ export class PaymentsController {
     return this.payments.initiate(user, orderId, dto.idempotencyKey);
   }
 
+  /** Un seul paiement pour tout le panier multi-dépôts. */
+  @Roles(Role.CLIENT) @Post('checkouts/:checkoutId/payments') @HttpCode(200)
+  initiateCheckout(
+    @CurrentUser() user: User,
+    @Param('checkoutId', ParseUUIDPipe) checkoutId: string,
+    @Body() dto: InitiatePaymentDto,
+  ) {
+    return this.payments.initiateCheckout(user, checkoutId, dto.idempotencyKey);
+  }
+
   /** Appelée par l'agrégateur, pas par un utilisateur : authentifiée par signature du corps brut. */
   @Public() @Post('payments/webhook') @HttpCode(200)
   webhook(

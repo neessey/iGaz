@@ -31,6 +31,35 @@ export function isExchangeCompatible(
     returned.brandId === product.brandId && returned.cylinderTypeId === product.cylinderTypeId;
 }
 
+/** Panier multi-dépôts : au plus 3 dépôts, pour un suivi lisible et peu de remboursements partiels. */
+export const MAX_STORES_PER_CHECKOUT = 3;
+export const MAX_ITEMS_PER_ORDER = 10;
+
+/**
+ * Vérifie la forme d'un panier avant toute lecture en base. Retourne le message d'erreur (en français) ou null.
+ * Chaque dépôt n'apparaît qu'une fois : ses articles forment une seule commande.
+ */
+export function checkoutShapeError(stores: { storeId: string; items: unknown[] }[]): string | null {
+  if (stores.length === 0) return 'Le panier est vide';
+  if (stores.length > MAX_STORES_PER_CHECKOUT) return `Un panier peut contenir au plus ${MAX_STORES_PER_CHECKOUT} dépôts`;
+  if (new Set(stores.map((s) => s.storeId)).size !== stores.length) return 'Un même dépôt apparaît deux fois dans le panier';
+  if (stores.some((s) => s.items.length === 0)) return 'Un dépôt du panier n’a aucun article';
+  if (stores.some((s) => s.items.length > MAX_ITEMS_PER_ORDER)) return `Au plus ${MAX_ITEMS_PER_ORDER} articles par dépôt`;
+  return null;
+}
+
+/**
+ * Totaux d'une commande (un dépôt) : prix unitaires figés × quantités, plus les frais de livraison du dépôt
+ * seulement en livraison. Montants en FCFA entiers.
+ */
+export function orderTotals(
+  items: { unitPrice: number; quantity: number }[], fulfillment: 'DELIVERY' | 'PICKUP', storeDeliveryFee: number,
+) {
+  const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+  const deliveryFee = fulfillment === 'DELIVERY' ? storeDeliveryFee : 0;
+  return { subtotal, deliveryFee, total: subtotal + deliveryFee };
+}
+
 function toMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);
   return h * 60 + m;

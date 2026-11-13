@@ -1,7 +1,7 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
 import { Guard } from '@/components/Shell';
-import { Field, Loading, Notice } from '@/components/ui';
+import { Field, Loading, Notice, PageHead } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
 import { fcfa, phoneFmt } from '@/lib/format';
 import { Zone } from '@/lib/types';
@@ -51,11 +51,11 @@ function StoreForm() {
 
   return (
     <form className="stack-lg" onSubmit={submit}>
-      <h1>{store ? 'Ma boutique' : 'Créer ma boutique'}</h1>
+      <PageHead title={store ? 'Ma boutique' : 'Créer ma boutique'} back="/fournisseur" />
 
       {store && (
-        <div className="stack-sm">
-          <h2 className="small" style={{ fontFamily: 'var(--font-body)', fontWeight: 700 }}>État de la boutique</h2>
+        <div className="card stack-sm">
+          <h2>État de la boutique</h2>
           <div className="segmented" role="radiogroup" aria-label="État de la boutique" style={{ maxWidth: 380 }}>
             <button type="button" role="radio" aria-checked={form.isOpen} onClick={() => set('isOpen', true)}>Ouverte</button>
             <button type="button" role="radio" aria-checked={!form.isOpen} onClick={() => set('isOpen', false)}>En pause</button>
@@ -64,7 +64,7 @@ function StoreForm() {
         </div>
       )}
 
-      <div className="stack">
+      <div className="card stack">
         <Field label="Nom de la boutique"><input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} required minLength={2} /></Field>
         <Field label="Adresse"><input className="input" value={form.address} onChange={(e) => set('address', e.target.value)} required minLength={3} /></Field>
         <Field label="Téléphone de la boutique"><input className="input" inputMode="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} required /></Field>
@@ -74,11 +74,11 @@ function StoreForm() {
         </div>
       </div>
 
-      <div className="stack-sm">
-        <h2 className="small" style={{ fontFamily: 'var(--font-body)', fontWeight: 700 }}>Remise des bouteilles</h2>
+      <div className="card stack-sm">
+        <h2>Remise des bouteilles</h2>
         {([['offersDelivery', 'Je livre chez le client'], ['offersPickup', 'Le client retire au dépôt']] as const).map(([k, label]) => (
           <label key={k} style={{ display: 'flex', gap: 12, alignItems: 'center', minHeight: 44 }}>
-            <input type="checkbox" checked={form[k]} onChange={(e) => set(k, e.target.checked)} style={{ width: 26, height: 26, accentColor: '#0c6b58' }} />
+            <input type="checkbox" checked={form[k]} onChange={(e) => set(k, e.target.checked)} style={{ width: 26, height: 26 }} />
             {label}
           </label>
         ))}
@@ -89,8 +89,8 @@ function StoreForm() {
         )}
       </div>
 
-      <div className="stack-sm">
-        <h2 className="small" style={{ fontFamily: 'var(--font-body)', fontWeight: 700 }}>Communes desservies</h2>
+      <div className="card stack-sm">
+        <h2>Communes desservies</h2>
         <div className="chips" role="group" aria-label="Communes desservies">
           {zones.map((z) => (
             <button type="button" key={z.id} className="chip" aria-pressed={form.zoneIds.includes(z.id)} onClick={() => toggleZone(z.id)}>{z.name}</button>

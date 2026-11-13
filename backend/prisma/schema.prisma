@@ -74,6 +74,7 @@ model User {
   supplier  Supplier?
   addresses Address[]
   orders    Order[]
+  checkouts Checkout[]
   auditLogs AuditLog[]
 }
 
@@ -242,18 +243,38 @@ model Order {
   deliveryFee      Int             @default(0)
   total            Int
   confirmationCode String // code à 6 chiffres communiqué au client uniquement
+  checkoutId       String? // panier multi-dépôts dont fait partie la commande (null : commande directe)
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
-  client  User         @relation(fields: [clientId], references: [id])
-  store   Store        @relation(fields: [storeId], references: [id])
-  zone    ServiceZone? @relation(fields: [zoneId], references: [id])
-  items   OrderItem[]
-  events  OrderEvent[]
+  client   User         @relation(fields: [clientId], references: [id])
+  store    Store        @relation(fields: [storeId], references: [id])
+  zone     ServiceZone? @relation(fields: [zoneId], references: [id])
+  checkout Checkout?    @relation(fields: [checkoutId], references: [id], onDelete: Restrict)
+  items    OrderItem[]
+  events   OrderEvent[]
   payments Payment[]
 
   @@index([clientId, createdAt])
   @@index([storeId, status])
+  @@index([checkoutId])
+}
+
+/// Passage en caisse d'un panier multi-dépôts : une commande par dépôt (cloisonnement intact), créées ensemble
+/// (tout ou rien) et, en mobile money, payées en une seule fois par un Payment rattaché au Checkout.
+model Checkout {
+  id            String        @id @default(uuid())
+  code          String        @unique // référence courte lisible (PN-XXXXXXXX)
+  clientId      String
+  paymentMethod PaymentMethod
+  total         Int // somme des totaux des commandes à la création
+  createdAt     DateTime      @default(now())
+
+  client   User      @relation(fields: [clientId], references: [id])
+  orders   Order[]
+  payments Payment[]
+
+  @@index([clientId, createdAt])
 }
 
 model OrderItem {
@@ -283,9 +304,12 @@ model OrderEvent {
   @@index([orderId, createdAt])
 }
 
+/// Rattaché soit à une commande (commande directe, espèces), soit à un Checkout (mobile money d'un panier) :
+/// exactement l'un des deux, garanti par la contrainte « Payment_one_target » de la migration 0002.
 model Payment {
   id             String        @id @default(uuid())
-  orderId        String
+  orderId        String?
+  checkoutId     String?
   method         PaymentMethod
   amount         Int
   status         PaymentStatus @default(PENDING)
@@ -294,9 +318,11 @@ model Payment {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  order Order @relation(fields: [orderId], references: [id])
+  order    Order?    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  checkout Checkout? @relation(fields: [checkoutId], references: [id], onDelete: Restrict)
 
   @@index([orderId])
+  @@index([checkoutId])
 }
 
 model AuditLog {

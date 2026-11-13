@@ -3,6 +3,10 @@ import { OrderStatus } from './types';
 /** « 7 500 F » : espace insécable entre les milliers, FCFA sous-entendu dans l'interface. */
 export const fcfa = (n: number) => `${n.toLocaleString('fr-FR').replace(/ /g, ' ')} F`;
 
+/** Montant court pour les tuiles de chiffres : « 2,45 M F » au-delà du million. */
+export const fcfaShort = (n: number) =>
+  n >= 1_000_000 ? `${(n / 1_000_000).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} M F` : fcfa(n);
+
 export const STATUS_LABEL: Record<OrderStatus, string> = {
   PENDING_PAYMENT: 'En attente du paiement',
   SUBMITTED: 'Envoyée au dépôt',
@@ -18,6 +22,12 @@ export type Tone = 'wait' | 'go' | 'done' | 'stop';
 export const STATUS_TONE: Record<OrderStatus, Tone> = {
   PENDING_PAYMENT: 'wait', SUBMITTED: 'wait', ACCEPTED: 'go', READY_FOR_PICKUP: 'go',
   OUT_FOR_DELIVERY: 'go', COMPLETED: 'done', REJECTED: 'stop', CANCELLED: 'stop',
+};
+
+/** Libellés des actions du journal d'audit (AuditLog.action). */
+export const AUDIT_LABEL: Record<string, string> = {
+  CREATE: 'Création', UPDATE: 'Modification', SUPPLIER_APPROVED: 'Fournisseur validé', SUPPLIER_REJECTED: 'Fournisseur refusé',
+  SUPPLIER_SUSPENDED: 'Fournisseur suspendu', STOCK_CORRECTION: 'Correction de stock', ORDER_CANCEL: 'Commande annulée',
 };
 
 export const dateTime = (iso: string) =>

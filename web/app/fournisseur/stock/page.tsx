@@ -3,9 +3,10 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Cylinder } from '@/components/Cylinder';
 import { Guard } from '@/components/Shell';
-import { Empty, Field, Loading, Notice } from '@/components/ui';
+import { Empty, Field, Loading, Notice, PageHead } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
 import { fcfa } from '@/lib/format';
+import { brandColor } from '@/lib/media';
 import { Brand, Cylinder as CylinderType } from '@/lib/types';
 
 interface Product {
@@ -34,9 +35,9 @@ function Row({ storeId, product, onChange }: { storeId: string; product: Product
   const base = `/stores/${storeId}/products/${product.id}`;
 
   return (
-    <article className="stack-sm" style={{ opacity: product.isActive ? 1 : 0.6 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr', gap: 14, alignItems: 'center' }}>
-        <span className="cyl-slot" style={{ height: 80 }}><Cylinder kg={product.cylinderType.capacityKg} /></span>
+    <article className="card stack-sm" style={{ opacity: product.isActive ? 1 : 0.6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr', gap: 14, alignItems: 'center' }}>
+        <span className="offer-media" style={{ width: 64, height: 64 }}><Cylinder kg={product.cylinderType.capacityKg} color={brandColor(product.brand.name)} scale={0.55} /></span>
         <div>
           <h3>{product.brand.name} {product.cylinderType.label}</h3>
           <p className="small muted">Achat {fcfa(product.purchasePrice)}, échange {fcfa(product.exchangePrice)}{product.isActive ? '' : '. Masqué aux clients'}</p>
@@ -47,7 +48,7 @@ function Row({ storeId, product, onChange }: { storeId: string; product: Product
           <button aria-label="Une bouteille de moins" onClick={() => setQty((q) => Math.max(0, q - 1))}>−</button>
           <input aria-label={`Stock ${product.brand.name} ${product.cylinderType.label}`} className="num" inputMode="numeric"
             value={qty} onChange={(e) => setQty(Math.max(0, Number(e.target.value.replace(/\D/g, '')) || 0))}
-            style={{ width: 64, border: 0, background: 'transparent', textAlign: 'center', fontSize: '1.8rem' }} />
+            style={{ width: 56, border: 0, background: 'transparent' }} />
           <button aria-label="Une bouteille de plus" onClick={() => setQty((q) => q + 1)}>+</button>
         </span>
         <button className="btn btn-small" disabled={busy || qty === current}
@@ -55,7 +56,7 @@ function Row({ storeId, product, onChange }: { storeId: string; product: Product
           Enregistrer le stock
         </button>
       </div>
-      {current === 0 && <p className="small" style={{ color: 'var(--rust)', fontWeight: 700 }}>En rupture : ce produit n’apparaît pas dans la recherche.</p>}
+      {current === 0 && <p className="small" style={{ color: 'var(--red)', fontWeight: 700 }}>En rupture : ce produit n’apparaît pas dans la recherche.</p>}
       <div className="cluster">
         <button className="btn btn-quiet btn-small" onClick={() => setEditing((v) => !v)}>{editing ? 'Fermer' : 'Modifier les prix'}</button>
         <button className="btn btn-quiet btn-small" disabled={busy}
@@ -64,7 +65,7 @@ function Row({ storeId, product, onChange }: { storeId: string; product: Product
         </button>
       </div>
       {editing && (
-        <div className="stack-sm panel">
+        <div className="stack-sm panel panel-flag">
           <div className="cluster" style={{ alignItems: 'flex-end' }}>
             <Field label="Prix d’achat (F)"><input className="input" type="number" min={0} step={50} value={purchase} onChange={(e) => setPurchase(Number(e.target.value))} /></Field>
             <Field label="Prix d’échange (F)"><input className="input" type="number" min={0} step={50} value={exchange} onChange={(e) => setExchange(Number(e.target.value))} /></Field>
@@ -101,7 +102,7 @@ function AddProduct({ storeId, brands, cylinders, onAdded }: { storeId: string; 
   }
 
   return (
-    <section className="panel panel-flag stack" aria-labelledby="add">
+    <section className="card stack" aria-labelledby="add">
       <h2 id="add">Ajouter un produit</h2>
       <Field label="Marque">
         <select className="input" value={brandId} onChange={(e) => setBrandId(e.target.value)}>
@@ -150,7 +151,7 @@ function Stock() {
   if (!stores) return <Loading />;
   if (!store) return (
     <div className="stack">
-      <h1>Stock</h1>
+      <PageHead title="Mon stock" back="/fournisseur" />
       <Empty title="Créez d’abord votre boutique">Il faut une boutique pour ajouter des produits.</Empty>
       <Link className="btn" href="/fournisseur/boutique">Créer ma boutique</Link>
     </div>
@@ -159,7 +160,7 @@ function Stock() {
   return (
     <div className="stack-lg">
       <div className="stack-sm">
-        <h1>Stock</h1>
+        <PageHead title="Mon stock" back="/fournisseur" />
         <p className="muted">{store.name}. Mettez à jour vos quantités chaque jour : les clients ne voient que ce qui est en stock.</p>
       </div>
       {!products ? <Loading /> : products.length === 0 ? (
