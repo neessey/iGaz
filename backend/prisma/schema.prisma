@@ -1,8 +1,10 @@
 // Schéma MVP iGaz. Montants en FCFA (entiers, pas de décimales).
 
+// Moteur « library » (par défaut) : Vercel sait l'embarquer dans ses fonctions, ce qui n'est pas le cas du fichier
+// WebAssembly du mode engineType = "client". rhel-openssl-3.0.x : la cible Linux des fonctions Vercel.
 generator client {
-  provider   = "prisma-client-js"
-  engineType = "client"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

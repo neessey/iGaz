@@ -9,6 +9,7 @@ const direct = process.env.DATABASE_URL_UNPOOLED || process.env.POSTGRES_URL_NON
 if (!direct) throw new Error('DATABASE_URL manquant : reliez la base Neon au projet Vercel de l’API');
 
 run('npx prisma generate');
+// (Le moteur Prisma « library » pour Linux est embarqué automatiquement par le traçage de fichiers de Vercel.)
 run('npx prisma migrate deploy', { DATABASE_URL: direct });
 if (process.env.ADMIN_PHONE) run('npm run seed', { DATABASE_URL: direct });
 if (process.env.SEED_DEMO === 'true') run('npm run seed:demo', { DATABASE_URL: direct });
