@@ -2,9 +2,10 @@
   "name": "igaz-backend",
   "version": "0.1.0",
   "private": true,
-  "description": "API iGaz : marketplace de gaz domestique en Côte d'Ivoire (MVP)",
+  "description": "API iGaz : marketplace de gaz domestique en CÃ´te d'Ivoire (MVP)",
   "scripts": {
     "build": "nest build",
+    "vercel-build": "node scripts/vercel-build.mjs",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",

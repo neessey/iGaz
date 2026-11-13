@@ -1,5 +1,10 @@
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 const TOKEN_KEY = 'igaz.token';
+/**
+ * Démo en ligne protégée : clé envoyée à l'API pour qu'elle affiche le code de connexion (pas de SMS réel).
+ * À définir UNIQUEMENT pour le site de démo protégé par la connexion Vercel, jamais pour un site public.
+ */
+const DEMO_KEY = process.env.NEXT_PUBLIC_DEMO_ACCESS_KEY;
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -34,6 +39,7 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
       headers: {
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(DEMO_KEY && path === '/auth/otp/request' ? { 'x-igaz-demo': DEMO_KEY } : {}),
       },
       body: init.body ? JSON.stringify(init.body) : undefined,
     });

@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
+import { demoModeEnabled } from '../src/auth/demo';
 
 /**
  * Données de DÉMONSTRATION pour essayer l'interface en local (marques fictives, prix inventés).
@@ -9,7 +10,8 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 
 async function main() {
-  if (process.env.NODE_ENV === 'production') throw new Error('seed-demo interdit en production');
+  // Autorisé en production seulement pour la démo en ligne protégée (DEMO_ACCESS_KEY), dont la base ne sert qu'à la démo.
+  if (process.env.NODE_ENV === 'production' && !demoModeEnabled()) throw new Error('seed-demo interdit en production');
 
   const brands = await Promise.all(['Soleil Gaz', 'Lagune Gaz'].map((name) =>
     prisma.gasBrand.upsert({ where: { name }, update: {}, create: { name } })));

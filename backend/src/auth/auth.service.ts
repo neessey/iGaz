@@ -7,6 +7,7 @@ import { OrderStatus, User } from '@prisma/client';
 import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { normalizeIvorianPhone } from '../orders/order-rules';
+import { demoKeyMatches } from './demo';
 import { SmsProvider } from './sms.provider';
 
 const MAX_REQUESTS_PER_WINDOW = 3;
@@ -32,7 +33,7 @@ export class AuthService {
     return phone;
   }
 
-  async requestOtp(rawPhone: string) {
+  async requestOtp(rawPhone: string, demoKey?: string) {
     const phone = this.phoneOrThrow(rawPhone);
 
     const recent = await this.prisma.otpCode.count({
@@ -52,8 +53,9 @@ export class AuthService {
       },
     });
     await this.sms.send(phone, `iGaz : votre code de connexion est ${code}. Il expire dans ${Math.round(ttl / 60)} min.`);
-    // Démonstration locale uniquement : jamais en production, et seulement si EXPOSE_DEV_OTP=true.
-    const expose = this.config.get('EXPOSE_DEV_OTP') === 'true' && process.env.NODE_ENV !== 'production';
+    // Démonstration locale (EXPOSE_DEV_OTP=true, jamais en production) ou démo en ligne protégée par clé (voir demo.ts).
+    const local = this.config.get('EXPOSE_DEV_OTP') === 'true' && process.env.NODE_ENV !== 'production';
+    const expose = local || demoKeyMatches(this.config.get<string>('DEMO_ACCESS_KEY'), demoKey);
     return expose ? { sent: true, devCode: code } : { sent: true };
   }
 

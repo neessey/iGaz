@@ -1,4 +1,5 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Headers, HttpCode, Patch, Post } from '@nestjs/common';
+import { DEMO_HEADER } from './demo';
 import { User } from '@prisma/client';
 import { CurrentUser, Public } from '../common/decorators';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,8 +12,8 @@ export class AuthController {
   constructor(private readonly auth: AuthService, private readonly prisma: PrismaService) {}
 
   @Public() @Post('otp/request') @HttpCode(200)
-  request(@Body() dto: RequestOtpDto) {
-    return this.auth.requestOtp(dto.phone);
+  request(@Body() dto: RequestOtpDto, @Headers(DEMO_HEADER) demoKey?: string) {
+    return this.auth.requestOtp(dto.phone, demoKey);
   }
 
   @Public() @Post('otp/verify') @HttpCode(200)

@@ -104,6 +104,16 @@ describe('iGaz MVP — parcours complet', () => {
     const shown = await http().post('/auth/otp/request').send({ phone: '0708888887' }).expect(200);
     expect(shown.body.devCode).toBe(sms.last.get('+2250708888887'));
     process.env.EXPOSE_DEV_OTP = 'false';
+
+    // Démo en ligne protégée : code révélé seulement avec la bonne clé de démo
+    process.env.DEMO_ACCESS_KEY = 'cle-de-demo-tres-longue-0123456789';
+    const noKey = await http().post('/auth/otp/request').send({ phone: '0708888886' }).expect(200);
+    expect(noKey.body.devCode).toBeUndefined();
+    const badKey = await http().post('/auth/otp/request').set('x-igaz-demo', 'mauvaise-cle-mauvaise-cle-0000').send({ phone: '0708888886' }).expect(200);
+    expect(badKey.body.devCode).toBeUndefined();
+    const goodKey = await http().post('/auth/otp/request').set('x-igaz-demo', process.env.DEMO_ACCESS_KEY).send({ phone: '0708888886' }).expect(200);
+    expect(goodKey.body.devCode).toBe(sms.last.get('+2250708888886'));
+    delete process.env.DEMO_ACCESS_KEY;
   });
 
   // --------------------------------------------------------------- catalogue
