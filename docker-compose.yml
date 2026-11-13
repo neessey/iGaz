@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: igaz
+      POSTGRES_PASSWORD: igaz
+      POSTGRES_DB: igaz
+    ports:
+      - "5432:5432"
+    volumes:
+      - igaz_pgdata:/var/lib/postgresql/data
+
+volumes:
+  igaz_pgdata:

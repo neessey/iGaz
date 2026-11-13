@@ -1,0 +1,315 @@
+// Schéma MVP iGaz. Montants en FCFA (entiers, pas de décimales).
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENT
+  SUPPLIER
+  ADMIN
+}
+
+enum SupplierStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  REJECTED
+}
+
+enum FulfillmentType {
+  DELIVERY
+  PICKUP
+}
+
+enum PaymentMethod {
+  MOBILE_MONEY
+  CASH_ON_DELIVERY
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum SaleKind {
+  PURCHASE // achat sans retour de bouteille vide
+  EXCHANGE // échange d'une bouteille vide de même marque et même capacité
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT // mobile money en attente de confirmation officielle
+  SUBMITTED // transmise au fournisseur
+  ACCEPTED // acceptée, stock décompté
+  READY_FOR_PICKUP
+  OUT_FOR_DELIVERY
+  COMPLETED // code de confirmation vérifié
+  REJECTED // refusée par le fournisseur
+  CANCELLED
+}
+
+enum StockReason {
+  SUPPLIER_UPDATE
+  ORDER_ACCEPTED
+  ORDER_RELEASED
+  ADMIN_CORRECTION
+}
+
+model User {
+  id        String   @id @default(uuid())
+  phone     String   @unique
+  name      String?
+  role      Role     @default(CLIENT)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  supplier  Supplier?
+  addresses Address[]
+  orders    Order[]
+  auditLogs AuditLog[]
+}
+
+model OtpCode {
+  id         String    @id @default(uuid())
+  phone      String
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([phone, createdAt])
+}
+
+model ServiceZone {
+  id       String  @id @default(uuid())
+  name     String  @unique // commune, ex. « Cocody »
+  city     String  @default("Abidjan")
+  isActive Boolean @default(true)
+
+  addresses Address[]
+  areas     StoreServiceArea[]
+  orders    Order[]
+}
+
+model Address {
+  id        String   @id @default(uuid())
+  userId    String
+  zoneId    String
+  label     String   @default("Domicile")
+  details   String // quartier, repère, indications pour le livreur
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime @default(now())
+
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  zone ServiceZone @relation(fields: [zoneId], references: [id])
+
+  @@index([userId])
+}
+
+model Supplier {
+  id           String         @id @default(uuid())
+  userId       String         @unique
+  businessName String
+  status       SupplierStatus @default(PENDING)
+  createdAt    DateTime       @default(now())
+
+  user      User               @relation(fields: [userId], references: [id])
+  documents SupplierDocument[]
+  stores    Store[]
+}
+
+model SupplierDocument {
+  id         String   @id @default(uuid())
+  supplierId String
+  type       String // autorisation de distribution, pièce d'identité du gérant, etc.
+  url        String
+  createdAt  DateTime @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+}
+
+model Store {
+  id              String   @id @default(uuid())
+  supplierId      String
+  name            String
+  address         String
+  phone           String
+  opensAt         String   @default("07:00") // HH:mm
+  closesAt        String   @default("20:00") // HH:mm
+  isOpen          Boolean  @default(true) // suspension temporaire par le fournisseur
+  offersDelivery  Boolean  @default(true)
+  offersPickup    Boolean  @default(true)
+  deliveryFee     Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  supplier Supplier           @relation(fields: [supplierId], references: [id])
+  areas    StoreServiceArea[]
+  products Product[]
+  orders   Order[]
+}
+
+model StoreServiceArea {
+  storeId String
+  zoneId  String
+
+  store Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  zone  ServiceZone @relation(fields: [zoneId], references: [id])
+
+  @@id([storeId, zoneId])
+}
+
+model GasBrand {
+  id       String  @id @default(uuid())
+  name     String  @unique
+  isActive Boolean @default(true)
+
+  products Product[]
+}
+
+model CylinderType {
+  id         String  @id @default(uuid())
+  label      String  @unique // B3, B6, B12...
+  capacityKg Int     @unique
+  isActive   Boolean @default(true)
+
+  products Product[]
+}
+
+model Product {
+  id             String   @id @default(uuid())
+  storeId        String
+  brandId        String
+  cylinderTypeId String
+  purchasePrice  Int // bouteille pleine sans retour
+  exchangePrice  Int // bouteille pleine contre une vide compatible
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  store        Store        @relation(fields: [storeId], references: [id])
+  brand        GasBrand     @relation(fields: [brandId], references: [id])
+  cylinderType CylinderType @relation(fields: [cylinderTypeId], references: [id])
+  inventory    Inventory?
+  movements    StockMovement[]
+  orderItems   OrderItem[]
+
+  @@unique([storeId, brandId, cylinderTypeId])
+}
+
+model Inventory {
+  productId String   @id
+  quantity  Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model StockMovement {
+  id        String      @id @default(uuid())
+  productId String
+  delta     Int
+  reason    StockReason
+  orderId   String?
+  actorId   String?
+  note      String?
+  createdAt DateTime    @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([productId, createdAt])
+}
+
+model Order {
+  id               String          @id @default(uuid())
+  code             String          @unique // référence courte lisible
+  clientId         String
+  storeId          String
+  fulfillment      FulfillmentType
+  paymentMethod    PaymentMethod
+  status           OrderStatus
+  zoneId           String?
+  deliveryDetails  String? // copie de l'adresse au moment de la commande
+  subtotal         Int
+  deliveryFee      Int             @default(0)
+  total            Int
+  confirmationCode String // code à 6 chiffres communiqué au client uniquement
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  client  User         @relation(fields: [clientId], references: [id])
+  store   Store        @relation(fields: [storeId], references: [id])
+  zone    ServiceZone? @relation(fields: [zoneId], references: [id])
+  items   OrderItem[]
+  events  OrderEvent[]
+  payments Payment[]
+
+  @@index([clientId, createdAt])
+  @@index([storeId, status])
+}
+
+model OrderItem {
+  id                     String   @id @default(uuid())
+  orderId                String
+  productId              String
+  kind                   SaleKind
+  quantity               Int
+  unitPrice              Int // prix figé au moment de la commande
+  returnedBrandId        String? // marque de la bouteille vide remise (échange)
+  returnedCylinderTypeId String?
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model OrderEvent {
+  id        String      @id @default(uuid())
+  orderId   String
+  status    OrderStatus
+  actorId   String?
+  note      String?
+  createdAt DateTime    @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  orderId        String
+  method         PaymentMethod
+  amount         Int
+  status         PaymentStatus @default(PENDING)
+  idempotencyKey String        @unique
+  providerRef    String?       @unique
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([entity, entityId])
+}
