@@ -136,7 +136,7 @@ export default function Profile() {
       <LinkList label="Raccourcis" items={LINKS[user.role]} />
       <LinkList label="Aide et informations" items={INFO} />
 
-      <button className="btn btn-quiet btn-block" onClick={() => { signOut(); cart.clear(); router.push('/'); }}>
+      <button className="btn btn-quiet btn-block" onClick={() => { signOut(); cart.clear(); router.replace('/connexion'); }}>
         <Icon name="logout" size={20} />Se déconnecter
       </button>
       {user.role !== 'ADMIN' && (

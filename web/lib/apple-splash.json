@@ -1,0 +1,22 @@
+[
+  { "w": 440, "h": 956, "dpr": 3, "devices": "iPhone 16 Pro Max, 17 Pro Max" },
+  { "w": 420, "h": 912, "dpr": 3, "devices": "iPhone Air" },
+  { "w": 402, "h": 874, "dpr": 3, "devices": "iPhone 16 Pro, 17, 17 Pro" },
+  { "w": 430, "h": 932, "dpr": 3, "devices": "iPhone 14 Pro Max, 15 Plus, 15 Pro Max, 16 Plus" },
+  { "w": 393, "h": 852, "dpr": 3, "devices": "iPhone 14 Pro, 15, 15 Pro, 16, 16e" },
+  { "w": 428, "h": 926, "dpr": 3, "devices": "iPhone 12 Pro Max, 13 Pro Max, 14 Plus" },
+  { "w": 390, "h": 844, "dpr": 3, "devices": "iPhone 12, 12 Pro, 13, 13 Pro, 14" },
+  { "w": 375, "h": 812, "dpr": 3, "devices": "iPhone X, XS, 11 Pro, 12 mini, 13 mini" },
+  { "w": 414, "h": 896, "dpr": 3, "devices": "iPhone XS Max, 11 Pro Max" },
+  { "w": 414, "h": 896, "dpr": 2, "devices": "iPhone XR, 11" },
+  { "w": 414, "h": 736, "dpr": 3, "devices": "iPhone 6s Plus, 7 Plus, 8 Plus" },
+  { "w": 375, "h": 667, "dpr": 2, "devices": "iPhone 6s, 7, 8, SE (2e et 3e génération)" },
+  { "w": 320, "h": 568, "dpr": 2, "devices": "iPhone SE (1re génération)" },
+  { "w": 1024, "h": 1366, "dpr": 2, "devices": "iPad Pro 12,9 pouces" },
+  { "w": 1032, "h": 1376, "dpr": 2, "devices": "iPad Pro 13 pouces (M4)" },
+  { "w": 834, "h": 1194, "dpr": 2, "devices": "iPad Pro 11 pouces" },
+  { "w": 834, "h": 1210, "dpr": 2, "devices": "iPad Pro 11 pouces (M4)" },
+  { "w": 820, "h": 1180, "dpr": 2, "devices": "iPad Air, iPad (10e génération)" },
+  { "w": 744, "h": 1133, "dpr": 2, "devices": "iPad mini (6e génération)" },
+  { "w": 768, "h": 1024, "dpr": 2, "devices": "iPad 9,7 pouces, iPad mini (5e génération)" }
+]

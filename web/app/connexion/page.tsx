@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FormEvent, Suspense, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
 import { Logo, LogoMark } from '@/components/Logo';
 import { Field, Notice } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
@@ -17,9 +17,9 @@ const nameOk = (s: string) => NAME_OK.test(s.trim().replace(/\s+/g, ' '));
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const { signIn, refresh } = useSession();
-  // Arrivé ici depuis une page réservée : on passe directement au numéro.
-  const [step, setStep] = useState<Step>(params.get('next') ? 'phone' : 'welcome');
+  const { user, ready, signIn, refresh, continueAsGuest } = useSession();
+  // Toujours l'écran d'accueil d'abord (première ouverture, déconnexion, page réservée) ; « next » sert après la connexion.
+  const [step, setStep] = useState<Step>('welcome');
   const [signup, setSignup] = useState(false);
   const [phone, setPhone] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -31,6 +31,11 @@ function LoginForm() {
   const [destination, setDestination] = useState('/');
 
   const namesValid = nameOk(firstName) && nameOk(lastName);
+
+  // Déjà connecté (application rouverte sur cette page) : direction l'accueil du compte.
+  useEffect(() => {
+    if (ready && user && step === 'welcome') router.replace(params.get('next') ?? homeFor(user.role));
+  }, [ready, user, step, router, params]);
 
   async function requestCode(e: FormEvent) {
     e.preventDefault();
@@ -114,7 +119,11 @@ function LoginForm() {
             <div className="stack-sm">
               <button className="btn btn-block" onClick={() => start(false)}>Se connecter</button>
               <button className="btn btn-ghost-light btn-block" onClick={() => start(true)}>Créer un compte</button>
-              <div style={{ textAlign: 'center' }}><Link href="/" className="text-btn" style={{ display: 'inline-flex', alignItems: 'center' }}>Continuer sans compte</Link></div>
+              <div style={{ textAlign: 'center' }}>
+                <button type="button" className="text-btn" onClick={() => { continueAsGuest(); router.replace('/'); }}>
+                  Continuer sans compte
+                </button>
+              </div>
             </div>
           </>
         ) : step === 'phone' ? (

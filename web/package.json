@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3001",
     "typecheck": "tsc --noEmit",
-    "icons": "node scripts/generate-icons.mjs",
+    "icons": "node scripts/generate-icons.mjs && node scripts/generate-splash.mjs",
+    "splash": "node scripts/generate-splash.mjs",
     "logo": "node scripts/extract-logo.mjs",
     "store-assets": "node scripts/store-assets.mjs"
   },

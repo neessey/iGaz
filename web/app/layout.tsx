@@ -6,6 +6,13 @@ import { Shell } from '@/components/Shell';
 import { CartProvider } from '@/lib/cart';
 import { NotificationsProvider } from '@/lib/notifications';
 import { SessionProvider } from '@/lib/session';
+import SPLASH_SCREENS from '@/lib/apple-splash.json';
+
+/** Écrans de lancement iPhone et iPad (npm run splash) : iOS choisit l'image qui correspond exactement à l'écran. */
+const startupImage = SPLASH_SCREENS.map(({ w, h, dpr }) => ({
+  url: `/splash/apple-splash-${w * dpr}x${h * dpr}.png`,
+  media: `(device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${dpr}) and (orientation: portrait)`,
+}));
 
 export const metadata: Metadata = {
   title: 'iGaz CI : le gaz, simplement',
@@ -19,7 +26,9 @@ export const metadata: Metadata = {
     apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180' }],
   },
   // Barre d'état iPhone classique (texte sombre) : les écrans client ont un fond clair.
-  appleWebApp: { capable: true, title: 'iGaz CI', statusBarStyle: 'default' },
+  appleWebApp: { capable: true, title: 'iGaz CI', statusBarStyle: 'default', startupImage },
+  // iOS n'affiche les écrans de lancement qu'avec cette balise historique (Next n'écrit que « mobile-web-app-capable »).
+  other: { 'apple-mobile-web-app-capable': 'yes' },
 };
 
 export const viewport: Viewport = { themeColor: '#f4f3fa', width: 'device-width', initialScale: 1, viewportFit: 'cover' };

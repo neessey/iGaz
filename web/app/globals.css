@@ -566,3 +566,13 @@ dl.facts .total { font-weight: 800; font-size: 1.1rem; color: var(--ink); paddin
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ---- Écran de lancement (components/Splash.tsx) : pictogramme centré, comme les images de lancement iPhone ---- */
+.splash { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; }
+.splash-brand {
+  position: absolute; left: 0; right: 0; top: calc(50% + 84px); margin: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+}
+.splash-brand .logo-word { font-size: 2rem; }
+.splash-brand .logo-word span { color: var(--orange); }
+.splash-tagline { font-size: 1rem; opacity: 0.85; }

@@ -10,6 +10,7 @@ import { CartBar } from './CartBar';
 import { Icon, IconName } from './Icon';
 import { Logo } from './Logo';
 import { OfflineNotice, ServiceWorker } from './Pwa';
+import { Splash, useLaunching } from './Splash';
 import { Loading } from './ui';
 
 type Tab = { href: string; label: string; icon: IconName };
@@ -41,14 +42,33 @@ const TABS: Record<Role, Tab[]> = {
 /** Pages plein écran, sans en-tête ni barre d'onglets. */
 const BARE = ['/connexion'];
 
+/** Pages ouvertes sans compte ni écran de connexion (liens publics exigés par le Play Store, page hors ligne). */
+const PUBLIC = ['/connexion', '/conditions', '/confidentialite', '/aide', '/compte/supprimer', '/hors-ligne'];
+
 export function Shell({ children }: { children: ReactNode }) {
-  const { user } = useSession();
+  const { user, ready, guest } = useSession();
   const cart = useCart();
   const pathname = usePathname();
+  const router = useRouter();
+  const launching = useLaunching();
   const tabs = user ? TABS[user.role] : GUEST;
   const current = [...tabs].sort((a, b) => b.href.length - a.href.length).find(
     (t) => pathname === t.href || (t.href !== '/' && pathname.startsWith(t.href)),
   );
+
+  // Sans compte (première ouverture, ou après une déconnexion), l'application s'ouvre sur l'écran de connexion,
+  // sauf si le visiteur a choisi « Continuer sans compte ».
+  const open = PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const mustLogin = ready && !user && !guest && !open;
+  useEffect(() => {
+    if (mustLogin && !launching) {
+      // Après la connexion, retour à la page demandée (lien de notification, par exemple), sauf accueil et profil.
+      const back = pathname !== '/' && pathname !== '/profil';
+      router.replace(back ? `/connexion?next=${encodeURIComponent(pathname)}` : '/connexion');
+    }
+  }, [mustLogin, launching, pathname, router]);
+
+  if (!open && (!ready || launching || mustLogin)) return <><Splash /><ServiceWorker /></>;
 
   if (BARE.includes(pathname)) return <>{children}<ServiceWorker /></>;
 
