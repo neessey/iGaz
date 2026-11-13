@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "src/main.ts": {
+      "includeFiles": "node_modules/{.prisma/client,@prisma/client/runtime}/**/*.{wasm,js,mjs,json}"
+    }
+  }
+}
