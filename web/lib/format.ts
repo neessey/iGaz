@@ -28,6 +28,7 @@ export const STATUS_TONE: Record<OrderStatus, Tone> = {
 export const AUDIT_LABEL: Record<string, string> = {
   CREATE: 'Création', UPDATE: 'Modification', SUPPLIER_APPROVED: 'Fournisseur validé', SUPPLIER_REJECTED: 'Fournisseur refusé',
   SUPPLIER_SUSPENDED: 'Fournisseur suspendu', STOCK_CORRECTION: 'Correction de stock', ORDER_CANCEL: 'Commande annulée',
+  ACCOUNT_DELETED: 'Compte supprimé par son titulaire',
 };
 
 export const dateTime = (iso: string) =>
@@ -37,6 +38,7 @@ export const kindLabel = (kind: 'PURCHASE' | 'EXCHANGE') => (kind === 'EXCHANGE'
 
 /** +2250701020304 → 07 01 02 03 04 (format d'usage en Côte d'Ivoire). */
 export const phoneFmt = (p: string) => {
+  if (p.startsWith('supprime:')) return 'compte supprimé'; // compte anonymisé à la demande de son titulaire
   const d = p.replace(/^\+225/, '');
   return /^\d{10}$/.test(d) ? d.replace(/(\d{2})(?=\d)/g, '$1 ') : p;
 };

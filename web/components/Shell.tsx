@@ -5,6 +5,7 @@ import { ReactNode, useEffect } from 'react';
 import { useCart } from '@/lib/cart';
 import { useSession } from '@/lib/session';
 import { Role } from '@/lib/types';
+import { CartBar } from './CartBar';
 import { Icon, IconName } from './Icon';
 import { Logo } from './Logo';
 import { OfflineNotice, ServiceWorker } from './Pwa';
@@ -51,7 +52,10 @@ export function Shell({ children }: { children: ReactNode }) {
   if (BARE.includes(pathname)) return <>{children}<ServiceWorker /></>;
 
   // Les espaces fournisseur et admin affichent leur propre en-tête violet ; le client garde une barre légère.
-  const ownHeader = pathname.startsWith('/fournisseur') || pathname.startsWith('/admin') || pathname.startsWith('/produit/');
+  // Pages d'achat : barre « Voir le panier » flottante (pas pour les comptes vendeur ou admin).
+  const shopping = (!user || user.role === 'CLIENT') && (pathname === '/' || pathname.startsWith('/depot/'));
+  const ownHeader = pathname === '/' || pathname.startsWith('/fournisseur') || pathname.startsWith('/admin')
+    || pathname.startsWith('/produit/') || pathname.startsWith('/depot/');
 
   return (
     <>
@@ -66,6 +70,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <main className="page">
         <OfflineNotice />
         {children}
+        {shopping && <CartBar />}
       </main>
       <nav className="tabbar" aria-label="Navigation principale">
         <div className="tabbar-in">

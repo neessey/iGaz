@@ -42,6 +42,9 @@ Les tests e2e rejouent le parcours complet sur une vraie base PostgreSQL : appli
 | Produits et stock | Prix d'achat / d'échange par boutique, stock avec journal des mouvements, correction admin justifiée |
 | Recherche publique | Uniquement les offres commandables : stock > 0, fournisseur validé, boutique ouverte, mode et zone desservis |
 | Commandes | Achat ou échange, livraison ou retrait, prix figés, un fournisseur par commande |
+| Nom | Inscription : `firstName` et `lastName` dans `POST /auth/otp/verify` (les deux ou aucun), mis en forme « Prénom Nom » ; `PATCH /auth/me` pour les modifier (lettres, espaces, tirets, apostrophes, 40 caractères) |
+| Compte | `DELETE /auth/me` : suppression par le titulaire (anonymisation, adresses effacées, commandes gardées sans identité ; refusée si une commande est en cours ou pour un admin ; vendeur suspendu, boutiques fermées) |
+| Adresses | `GET/POST /addresses`, `PATCH /addresses/:id` (nom, commune, repères), `DELETE /addresses/:id` ; uniquement les siennes |
 | Panier multi-dépôts | `POST /checkouts` : jusqu'à 3 dépôts, une commande par dépôt créées ensemble ou pas du tout (le refus nomme le dépôt) ; `GET /checkouts/:id` ; `POST /checkouts/:id/payments` : un seul paiement mobile money pour les commandes encore à payer |
 | Cycle de vie | `PENDING_PAYMENT → SUBMITTED → ACCEPTED → READY_FOR_PICKUP / OUT_FOR_DELIVERY → COMPLETED` (+ refus, annulations) |
 | Paiement | Mobile money par webhook signé (HMAC), idempotent ; paiement à la livraison plafonné |

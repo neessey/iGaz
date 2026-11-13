@@ -5,8 +5,12 @@ import { normalizeIvorianPhone } from '../src/orders/order-rules';
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 
-// Communes d'Abidjan de départ ; l'administrateur peut en activer d'autres ensuite.
-const ZONES = ['Cocody', 'Yopougon', 'Abobo', 'Adjamé', 'Plateau', 'Marcory', 'Treichville', 'Koumassi', 'Port-Bouët', 'Attécoubé'];
+// Les 13 communes du District autonome d'Abidjan : les 10 communes de la ville et les 3 sous-préfectures
+// (Anyama, Bingerville, Songon). L'administrateur peut en désactiver ou en ajouter ensuite.
+const ZONES = [
+  'Abobo', 'Adjamé', 'Attécoubé', 'Cocody', 'Koumassi', 'Marcory', 'Plateau', 'Port-Bouët', 'Treichville', 'Yopougon',
+  'Anyama', 'Bingerville', 'Songon',
+];
 // Formats usuels ; l'administrateur valide les marques réellement commercialisées.
 const CYLINDERS = [{ label: 'B3', capacityKg: 3 }, { label: 'B6', capacityKg: 6 }, { label: 'B12', capacityKg: 12 }];
 

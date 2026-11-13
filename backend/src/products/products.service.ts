@@ -150,6 +150,7 @@ export class ProductsService {
         ...(q.fulfillment === 'PICKUP' ? { offersPickup: true } : {}),
         ...(q.zoneId ? { areas: { some: { zoneId: q.zoneId } } } : {}),
       },
+      ...(q.storeId ? { storeId: q.storeId } : {}),
       ...(q.brandId ? { brandId: q.brandId } : {}),
       ...(q.cylinderTypeId ? { cylinderTypeId: q.cylinderTypeId } : {}),
       ...(q.maxPrice !== undefined ? { purchasePrice: { lte: q.maxPrice } } : {}),
@@ -162,6 +163,7 @@ export class ProductsService {
           select: {
             id: true, name: true, address: true, phone: true, opensAt: true, closesAt: true,
             offersDelivery: true, offersPickup: true, deliveryFee: true,
+            areas: { select: { zoneId: true } },
           },
         },
       },

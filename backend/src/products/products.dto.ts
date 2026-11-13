@@ -27,6 +27,8 @@ export class AdminSetStockDto extends SetStockDto {
 
 export class SearchProductsQuery {
   @IsOptional() @IsUUID() zoneId?: string;
+  /** Page d'un dépôt : ses offres commandables seulement. */
+  @IsOptional() @IsUUID() storeId?: string;
   @IsOptional() @IsUUID() brandId?: string;
   @IsOptional() @IsUUID() cylinderTypeId?: string;
   @IsOptional() @IsEnum(FulfillmentType) fulfillment?: FulfillmentType;

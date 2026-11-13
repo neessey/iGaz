@@ -18,7 +18,9 @@ messages d'erreur, textes d'interface et documentation sont **en français**.
 
 - `backend/` : API NestJS + Prisma + PostgreSQL
 - `web/` : interface Next.js (App Router, TypeScript), PWA responsive, mobile d'abord. Trois espaces : client (`/`, `/produit/[id]`,
-  `/commandes`, `/profil`), fournisseur (`/fournisseur/*`), administration (`/admin/*`). Design : voir « Design » ci-dessous.
+  `/depot/[id]`, `/panier`, `/commandes`, `/profil`), fournisseur (`/fournisseur/*`), administration (`/admin/*`).
+  Parcours client façon appli de livraison : on choisit un dépôt, on ajoute avec « + », barre panier flottante
+  (s'inspirer des usages de ces applis, sans reprendre la marque ni le visuel d'une autre). Design : voir « Design » ci-dessous.
 
 ## Commandes du web (depuis `web/`)
 
@@ -67,6 +69,17 @@ fichier, l'interface affiche une illustration. Boutons d'au moins 44 px, pas d'a
   **ou** un panier, contrainte en base). Le dépôt ne voit jamais le panier (`present()` le retire).
 - Cloisonnement : un fournisseur ne voit jamais les boutiques, commandes ou finances d'un autre (réponse 404, pas 403).
 - Toute règle métier nouvelle ou modifiée s'accompagne d'un test (unitaire dans `order-rules.spec.ts` ou e2e dans `test/`).
+
+## Publication Play Store (voir `docs/android.md`)
+
+- Fait (lot 1) : 13 communes du district, gestion des adresses, suppression de compte (`DELETE /auth/me`, anonymisation,
+  page publique `/compte/supprimer`), pages `/conditions`, `/confidentialite`, `/aide`, route
+  `/.well-known/assetlinks.json` (variables `ANDROID_PACKAGE_NAME`, `ANDROID_SHA256_FINGERPRINTS`), visuels de fiche
+  (`npm run store-assets`).
+- Bloquant, dépend du propriétaire : `web/lib/legal.ts` à compléter (société, contacts), relecture juridique des textes,
+  hébergement HTTPS, prestataire SMS, agrégateur de paiement, accès des testeurs Google (connexion par SMS), compte Play.
+- Lots suivants convenus : 2 = avis et notes, statistiques vendeur, notifications, promotions ;
+  3 = messagerie, espace livreur, abonnements, gestion admin des clients et remboursements.
 
 ## Reste à faire (ordre suggéré)
 

@@ -18,8 +18,9 @@ Il faut l'API en route (voir `../backend/README.md`). Pour essayer sans SMS : la
 
 | Espace | Pages |
 | --- | --- |
-| Client | `/` recherche (taille, mode, commune, marque) · `/produit/[id]` commande achat ou échange, livraison ou retrait, paiement · `/panier` panier multi-dépôts (gardé dans le téléphone, 3 dépôts au plus) · `/panier/valider` mode par dépôt, adresse, paiement · `/commandes/panier/[id]` paiement unique et suivi des commandes du panier · `/commandes` et `/commandes/[id]` suivi, code de remise, annulation · `/profil` compte et déconnexion (tous rôles) |
-| Fournisseur | `/fournisseur` commandes (accepter, refuser, livrer, saisir le code) · `/fournisseur/stock` mise à jour rapide du stock et des prix · `/fournisseur/boutique` · `/fournisseur/inscription` |
+| Client | `/` accueil façon appli de livraison : « Livrer à » commune (filtre les dépôts qui la livrent), recherche, bannière, bulles de tailles, marques, cartes de dépôts (livraison ou retrait se choisit par dépôt à la validation) · `/depot/[id]` bouteilles du dépôt par taille, bouton « + » et volet d'ajout (achat / échange, quantité) · barre « Voir le panier » flottante · `/produit/[id]` commande achat ou échange, livraison ou retrait, paiement · `/panier` panier multi-dépôts (gardé dans le téléphone, 3 dépôts au plus) · `/panier/valider` mode par dépôt, adresse, paiement · `/commandes/panier/[id]` paiement unique et suivi des commandes du panier · `/commandes` et `/commandes/[id]` suivi, code de remise, annulation · `/profil` compte et déconnexion (tous rôles) · `/profil/adresses` · `/compte/supprimer` (page publique exigée par le Play Store) · `/aide`, `/conditions`, `/confidentialite` (informations de la société dans `lib/legal.ts`) |
+| Connexion | `/connexion` : « Créer un compte » demande prénom, nom et numéro ; un compte sans nom le saisit juste après le code ; modifiable dans `/profil` |
+| Fournisseur | `/fournisseur` en-tête violet (retour, cloche = commandes à accepter), carte boutique vérifiée, tuiles commandes / ventes / taux d'acceptation, revenus du mois en vert ; commandes (accepter, refuser, livrer, saisir le code) · `/fournisseur/stock` mise à jour rapide du stock et des prix · `/fournisseur/boutique` · `/fournisseur/inscription` |
 | Administration | `/admin` chiffres et validation des fournisseurs · `/admin/catalogue` · `/admin/commandes` · `/admin/audit` |
 
 ## Notes
@@ -30,6 +31,13 @@ Il faut l'API en route (voir `../backend/README.md`). Pour essayer sans SMS : la
 - Photos et logos : déposer les fichiers dans `public/images/` puis les déclarer dans `lib/media.ts` (photo de l'écran de
   connexion, bannière d'accueil, fond de la fiche produit, logos des marques, photos des dépôts). Sans fichier,
   l'interface affiche une illustration dessinée. N'utiliser que des images dont iGaz a les droits.
+
+## Tailles d'écran
+
+Vérifié de 320 px (petits Android) à 1440 px : aucune page ne défile horizontalement. Sous 360 px, marges réduites et
+textes secondaires masqués (`.hide-narrow`) ; à partir de 640 px, dépôts sur 2 colonnes ; à partir de 1024 px,
+l'accueil et les pages dépôt s'élargissent (classe `wide` sur la racine de la page, 3 colonnes), les formulaires
+restent étroits pour la lisibilité.
 
 ## Application installable (PWA)
 

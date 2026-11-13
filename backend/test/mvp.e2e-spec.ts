@@ -26,8 +26,8 @@ describe('iGaz MVP — parcours complet', () => {
   const http = () => request(app.getHttpServer());
 
   const phones = {
-    admin: '0700000000', client: '0701000001', client2: '0701000002',
-    supA: '0702000001', supB: '0702000002',
+    admin: '0700000000', client: '0701000001', client2: '0701000002', client3: '0701000003',
+    supA: '0702000001', supB: '0702000002', supC: '0702000003',
   };
   const tokens: Record<string, string> = {};
   const auth = (who: string) => ({ Authorization: `Bearer ${tokens[who]}` });
@@ -182,6 +182,9 @@ describe('iGaz MVP — parcours complet', () => {
     res = await http().get(`/products?cylinderTypeId=${ids.b6}`).expect(200);
     expect(res.body).toHaveLength(2);
     expect(res.body[0].purchasePrice).toBeLessThanOrEqual(res.body[1].purchasePrice);
+    // Page d'un dépôt : ses seules offres commandables (le B12 à stock zéro du dépôt A reste absent)
+    res = await http().get(`/products?storeId=${ids.storeA}`).expect(200);
+    expect(res.body.map((p: any) => p.id)).toEqual([ids.prodA]);
 
     await http().patch(`/suppliers/me/stores/${ids.storeB}`).set(auth('supB')).send({ isOpen: false }).expect(200);
     res = await http().get(`/products?zoneId=${ids.yop}`).expect(200);
@@ -634,6 +637,101 @@ describe('iGaz MVP — parcours complet', () => {
         expect(o.payments[0]).toMatchObject({ method: 'CASH_ON_DELIVERY', amount: o.total, status: 'PENDING' });
       }
       await http().post(`/checkouts/${res.body.id}/payments`).set(auth('client')).send({ idempotencyKey: 'panier-especes-01' }).expect(409);
+    });
+  });
+
+  // -------------------------------------------------- compte et adresses (Play Store)
+  describe('prénom et nom', () => {
+    it('inscription avec prénom et nom, mis en forme ; les deux sont requis ensemble', async () => {
+      const phone = '0701000044';
+      await http().post('/auth/otp/request').send({ phone }).expect(200);
+      let code = sms.last.get('+225' + phone)!;
+      await http().post('/auth/otp/verify').send({ phone, code, firstName: 'Awa' }).expect(400);
+      await http().post('/auth/otp/verify').send({ phone, code, firstName: 'Awa2', lastName: 'Koné' }).expect(400);
+      // Le code n'a pas été consommé par les refus de validation : on peut le réutiliser
+      const ok = await http().post('/auth/otp/verify').send({ phone, code, firstName: '  awa ', lastName: 'KONÉ' }).expect(200);
+      expect(ok.body.user.name).toBe('Awa Koné');
+      tokens.awa = ok.body.accessToken;
+
+      // Reconnexion sans nom : le nom enregistré est conservé
+      await http().post('/auth/otp/request').send({ phone }).expect(200);
+      code = sms.last.get('+225' + phone)!;
+      const again = await http().post('/auth/otp/verify').send({ phone, code }).expect(200);
+      expect(again.body.user.name).toBe('Awa Koné');
+    });
+
+    it('modifier son prénom et son nom', async () => {
+      const res = await http().patch('/auth/me').set(auth('awa')).send({ firstName: "n'guessan", lastName: 'kouassi-traoré' }).expect(200);
+      expect(res.body.name).toBe("N'Guessan Kouassi-Traoré");
+      expect((await http().get('/auth/me').set(auth('awa')).expect(200)).body.name).toBe("N'Guessan Kouassi-Traoré");
+      const bad = await http().patch('/auth/me').set(auth('awa')).send({ firstName: '<b>', lastName: 'X' }).expect(400);
+      expect(String(bad.body.message)).toMatch(/lettres/);
+      await http().patch('/auth/me').send({ firstName: 'A', lastName: 'B' }).expect(401);
+    });
+  });
+
+  describe('adresses et suppression de compte', () => {
+    it('le client gère ses adresses ; personne d’autre ne peut les modifier', async () => {
+      await login('client3');
+      const a = await http().post('/addresses').set(auth('client3')).send({ zoneId: ids.cocody, details: 'Riviera 2, villa 12' }).expect(201);
+      expect(a.body.label).toBe('Domicile');
+      const up = await http().patch(`/addresses/${a.body.id}`).set(auth('client3'))
+        .send({ label: 'Bureau', zoneId: ids.yop, details: 'Siporex, immeuble B' }).expect(200);
+      expect(up.body).toMatchObject({ label: 'Bureau', zoneId: ids.yop, details: 'Siporex, immeuble B' });
+      expect(up.body.zone.name).toBe('Yopougon');
+      await http().patch(`/addresses/${a.body.id}`).set(auth('client')).send({ label: 'Pirate' }).expect(404);
+      await http().delete(`/addresses/${a.body.id}`).set(auth('client')).expect(404);
+      await http().patch(`/addresses/${a.body.id}`).set(auth('client3')).send({ zoneId: randomUUID() }).expect(400);
+      await http().delete(`/addresses/${a.body.id}`).set(auth('client3')).expect(204);
+      expect((await http().get('/addresses').set(auth('client3')).expect(200)).body).toHaveLength(0);
+    });
+
+    it('suppression refusée tant qu’une commande est en cours, et pour l’administrateur', async () => {
+      const busy = await http().delete('/auth/me').set(auth('client')).expect(409);
+      expect(busy.body.message).toMatch(/commandes? en cours/);
+      await http().delete('/auth/me').set(auth('supB')).expect(409); // commandes en cours dans sa boutique
+      await http().delete('/auth/me').set(auth('admin')).expect(409);
+      await http().delete('/auth/me').expect(401);
+    });
+
+    it('suppression : compte anonymisé, jeton refusé, commandes gardées sans identité, numéro réutilisable', async () => {
+      const addr = await http().post('/addresses').set(auth('client3')).send({ zoneId: ids.cocody, details: 'Angré, chez Awa' }).expect(201);
+      const o = await http().post('/orders').set(auth('client3')).send({
+        storeId: ids.storeA, fulfillment: 'DELIVERY', paymentMethod: 'CASH_ON_DELIVERY', addressId: addr.body.id,
+        items: [{ productId: ids.prodA, kind: 'PURCHASE', quantity: 1 }],
+      }).expect(201);
+      await http().post(`/orders/${o.body.id}/cancel`).set(auth('client3')).expect(200);
+      const before = await prisma.user.findUniqueOrThrow({ where: { phone: '+225' + phones.client3 } });
+
+      await http().delete('/auth/me').set(auth('client3')).expect(204);
+      await http().get('/auth/me').set(auth('client3')).expect(401);
+
+      const gone = await prisma.user.findUniqueOrThrow({ where: { id: before.id } });
+      expect(gone).toMatchObject({ phone: `supprime:${before.id}`, name: null, isActive: false });
+      expect(await prisma.address.count({ where: { userId: before.id } })).toBe(0);
+      const kept = await prisma.order.findUniqueOrThrow({ where: { id: o.body.id } });
+      expect(kept.clientId).toBe(before.id);
+      expect(kept.deliveryDetails).toBeNull();
+      expect(await prisma.auditLog.count({ where: { action: 'ACCOUNT_DELETED', entityId: before.id } })).toBe(1);
+
+      // Le même numéro recrée un compte neuf, sans l'historique de l'ancien.
+      await login('client3');
+      const me = await http().get('/auth/me').set(auth('client3')).expect(200);
+      expect(me.body.id).not.toBe(before.id);
+      expect((await http().get('/orders').set(auth('client3')).expect(200)).body).toHaveLength(0);
+    });
+
+    it('un vendeur sans commande en cours peut supprimer son compte : fournisseur suspendu, boutiques fermées', async () => {
+      await login('supC');
+      await http().post('/suppliers/register').set(auth('supC')).send({ businessName: 'Dépôt à fermer' }).expect(201);
+      const supplier = await prisma.supplier.findFirstOrThrow({ where: { businessName: 'Dépôt à fermer' } });
+      await http().post(`/admin/suppliers/${supplier.id}/approve`).set(auth('admin')).expect(201);
+      await http().post('/suppliers/me/stores').set(auth('supC')).send({
+        name: 'Dépôt C', address: 'Bingerville centre', phone: '0733445566', zoneIds: [ids.cocody],
+      }).expect(201);
+      await http().delete('/auth/me').set(auth('supC')).expect(204);
+      expect((await prisma.supplier.findUniqueOrThrow({ where: { id: supplier.id } })).status).toBe('SUSPENDED');
+      expect(await prisma.store.count({ where: { supplierId: supplier.id, isOpen: true } })).toBe(0);
     });
   });
 });

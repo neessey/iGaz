@@ -8,23 +8,33 @@ import { api, errorText } from '@/lib/api';
 import { IMAGES } from '@/lib/media';
 import { homeFor, useSession } from '@/lib/session';
 
-type Step = 'welcome' | 'phone' | 'code';
+type Step = 'welcome' | 'phone' | 'code' | 'name';
+
+/** Même règle que l'API : lettres (accents compris), espaces, tirets, apostrophes ; 40 caractères au plus. */
+const NAME_OK = /^\p{L}[\p{L}' -]{0,39}$/u;
+const nameOk = (s: string) => NAME_OK.test(s.trim().replace(/\s+/g, ' '));
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const { signIn } = useSession();
+  const { signIn, refresh } = useSession();
   // Arrivé ici depuis une page réservée : on passe directement au numéro.
   const [step, setStep] = useState<Step>(params.get('next') ? 'phone' : 'welcome');
   const [signup, setSignup] = useState(false);
   const [phone, setPhone] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [code, setCode] = useState('');
   const [devCode, setDevCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [destination, setDestination] = useState('/');
+
+  const namesValid = nameOk(firstName) && nameOk(lastName);
 
   async function requestCode(e: FormEvent) {
     e.preventDefault();
+    if (signup && !namesValid) { setError('Indiquez votre prénom et votre nom (lettres, espaces, tirets ou apostrophes).'); return; }
     setBusy(true); setError(null);
     try {
       const r = await api<{ sent: boolean; devCode?: string }>('/auth/otp/request', { body: { phone } });
@@ -39,13 +49,45 @@ function LoginForm() {
     e.preventDefault();
     setBusy(true); setError(null);
     try {
-      const r = await api<{ accessToken: string }>('/auth/otp/verify', { body: { phone, code } });
+      const r = await api<{ accessToken: string }>('/auth/otp/verify', {
+        body: { phone, code, ...(signup ? { firstName: firstName.trim(), lastName: lastName.trim() } : {}) },
+      });
       const me = await signIn(r.accessToken);
-      router.replace(params.get('next') ?? homeFor(me.role));
+      const next = params.get('next') ?? homeFor(me.role);
+      // Compte sans nom (ancien compte, ou première connexion par « Se connecter ») : on le demande maintenant.
+      if (!me.name?.trim()) { setDestination(next); setStep('name'); return; }
+      router.replace(next);
     } catch (err) {
       setError(errorText(err));
     } finally { setBusy(false); }
   }
+
+  async function saveName(e: FormEvent) {
+    e.preventDefault();
+    if (!namesValid) { setError('Indiquez votre prénom et votre nom (lettres, espaces, tirets ou apostrophes).'); return; }
+    setBusy(true); setError(null);
+    try {
+      await api('/auth/me', { method: 'PATCH', body: { firstName: firstName.trim(), lastName: lastName.trim() } });
+      await refresh();
+      router.replace(destination);
+    } catch (err) {
+      setError(errorText(err));
+      setBusy(false);
+    }
+  }
+
+  const nameFields = (
+    <div className="name-grid">
+      <Field label="Prénom">
+        <input className="input" autoComplete="given-name" autoCapitalize="words" maxLength={40}
+          value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+      </Field>
+      <Field label="Nom">
+        <input className="input" autoComplete="family-name" autoCapitalize="words" maxLength={40}
+          value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+      </Field>
+    </div>
+  );
 
   const start = (isSignup: boolean) => { setSignup(isSignup); setStep('phone'); setError(null); };
 
@@ -78,15 +120,28 @@ function LoginForm() {
         ) : step === 'phone' ? (
           <form className="stack" onSubmit={requestCode} style={{ marginTop: 'auto' }}>
             <h1>{signup ? 'Créer un compte' : 'Se connecter'}</h1>
+            {signup && nameFields}
             <Field label="Votre numéro de téléphone" hint={signup
               ? 'Votre compte est créé dès que vous saisissez le code reçu par SMS. Pas de mot de passe.'
               : 'Nous vous envoyons un code par SMS. Pas de mot de passe à retenir.'}>
               <input className="input" inputMode="tel" autoComplete="tel" placeholder="07 01 02 03 04"
-                value={phone} onChange={(e) => setPhone(e.target.value)} required autoFocus />
+                value={phone} onChange={(e) => setPhone(e.target.value)} required autoFocus={!signup} />
             </Field>
             {error && <Notice kind="error">{error}</Notice>}
-            <button className="btn btn-block" disabled={busy || phone.trim().length < 8}>Recevoir le code</button>
+            <button className="btn btn-block" disabled={busy || phone.trim().length < 8 || (signup && !namesValid)}>Recevoir le code</button>
+            <p className="small" style={{ opacity: 0.85, textAlign: 'center', margin: '0 auto' }}>
+              En continuant, vous acceptez les <Link href="/conditions">conditions d’utilisation</Link> et
+              la <Link href="/confidentialite">politique de confidentialité</Link>.
+            </p>
             <button type="button" className="text-btn" onClick={() => { setStep('welcome'); setError(null); }}>Retour</button>
+          </form>
+        ) : step === 'name' ? (
+          <form className="stack" onSubmit={saveName} style={{ marginTop: 'auto' }}>
+            <h1>Comment vous appelez-vous&nbsp;?</h1>
+            <p style={{ opacity: 0.85 }}>Votre nom permet au dépôt de savoir qui il livre. Vous pourrez le modifier dans votre profil.</p>
+            {nameFields}
+            {error && <Notice kind="error">{error}</Notice>}
+            <button className="btn btn-block" disabled={busy || !namesValid}>Continuer</button>
           </form>
         ) : (
           <form className="stack" onSubmit={verify} style={{ marginTop: 'auto' }}>

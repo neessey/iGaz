@@ -73,7 +73,13 @@ function Checkout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offers, cart.groups.length]);
 
-  useEffect(() => { if (!newZone && zones[0]) setNewZone(zones[0].id); }, [zones, newZone]);
+  // Commune de la nouvelle adresse : celle choisie sur l'accueil, sinon à choisir (pas de valeur par défaut trompeuse).
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('igaz.zone');
+      if (saved && zones.some((z) => z.id === saved)) setNewZone((cur) => cur || saved);
+    } catch { /* ignoré */ }
+  }, [zones]);
 
   if (!cart.ready || (cart.lines.length > 0 && !offers)) return <Loading>Vérification des prix et du stock…</Loading>;
   if (cart.lines.length === 0) {
@@ -105,7 +111,8 @@ function Checkout() {
     }
     if (list.length) problems[g.storeId] = list;
   }
-  const blocked = Object.keys(problems).length > 0 || (needsAddress && addressChoice === 'new' && newDetails.trim().length < 3);
+  const blocked = Object.keys(problems).length > 0
+    || (needsAddress && addressChoice === 'new' && (!newZone || newDetails.trim().length < 3));
 
   const feeOf = (storeId: string) => (modes[storeId] === 'DELIVERY' ? storeOf(storeId)?.deliveryFee ?? 0 : 0);
   const total = cart.groups.reduce((sum, g) => sum + g.subtotal + feeOf(g.storeId), 0);
@@ -173,7 +180,7 @@ function Checkout() {
           <div className="stack-sm" role="radiogroup" aria-labelledby="adresse">
             {addresses.map((a) => (
               <button key={a.id} className="choice" role="radio" aria-checked={addressChoice === a.id} onClick={() => setAddressChoice(a.id)}>
-                <strong>{a.zone.name}</strong><span className="small muted" style={{ display: 'block' }}>{a.details}</span>
+                <strong>{a.label} · {a.zone.name}</strong><span className="small muted" style={{ display: 'block' }}>{a.details}</span>
               </button>
             ))}
             {addresses.length > 0 && (
@@ -186,6 +193,7 @@ function Checkout() {
             <div className="stack-sm">
               <Field label="Commune">
                 <select className="input" value={newZone} onChange={(e) => setNewZone(e.target.value)}>
+                  <option value="" disabled>Choisir ma commune</option>
                   {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
                 </select>
               </Field>
@@ -222,7 +230,7 @@ function Checkout() {
 
       <div className="sticky-cta">
         <button className="btn" disabled={busy || blocked} onClick={submit}>
-          {busy ? 'Envoi…' : cart.groups.length > 1 ? `Commander chez ${cart.groups.length} dépôts · ${fcfa(total)}` : `Commander · ${fcfa(total)}`}
+          {busy ? 'Envoi…' : <>Commander{cart.groups.length > 1 && <span className="hide-narrow"> chez {cart.groups.length} dépôts</span>} · {fcfa(total)}</>}
         </button>
       </div>
     </div>

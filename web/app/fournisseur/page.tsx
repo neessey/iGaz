@@ -1,13 +1,19 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { Guard, HeroHeader } from '@/components/Shell';
 import { Sparkline } from '@/components/Sparkline';
 import { Empty, Loading, Notice, StatusBadge } from '@/components/ui';
 import { api, ApiError, errorText } from '@/lib/api';
-import { dateTime, fcfa, fcfaShort, kindLabel, phoneFmt } from '@/lib/format';
+import { dateTime, fcfa, kindLabel, phoneFmt } from '@/lib/format';
+import { STORE_PHOTOS } from '@/lib/media';
 import { Order } from '@/lib/types';
+
+/** Montant pour une tuile : « 2 450 000 », ou « 12,5 M » au-delà de 10 millions pour tenir sur petit écran. */
+const compactAmount = (n: number) =>
+  n >= 10_000_000 ? `${(n / 1_000_000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} M` : n.toLocaleString('fr-FR').replace(/ |\s/g, ' ');
 
 interface SupplierMe { status: 'PENDING' | 'APPROVED' | 'SUSPENDED' | 'REJECTED'; businessName: string; stores: { id: string }[] }
 
@@ -109,6 +115,7 @@ function OrderCard({ order, onChange }: { order: Order; onChange: () => void }) 
 }
 
 function Dashboard() {
+  const router = useRouter();
   const [me, setMe] = useState<SupplierMe | null | 'none'>(null);
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -159,37 +166,61 @@ function Dashboard() {
   const nothing = sections.every(([, list]) => list.length === 0);
   const recent = by('COMPLETED', 'REJECTED', 'CANCELLED').slice(0, 5);
   const month = monthStats(by('COMPLETED'));
-  const todo = by('SUBMITTED', 'ACCEPTED', 'OUT_FOR_DELIVERY', 'READY_FOR_PICKUP').length;
+  const toAccept = by('SUBMITTED').length;
+  const sales = by('COMPLETED').reduce((sum, o) => sum + o.total, 0);
+  // Taux d'acceptation : commandes acceptées parmi celles sur lesquelles le dépôt s'est prononcé (pas encore d'avis clients).
+  const accepted = by('ACCEPTED', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'COMPLETED').length;
+  const decided = accepted + by('REJECTED').length;
+  const acceptRate = decided > 0 ? Math.round((accepted / decided) * 100) : null;
+  const storeId = me.stores[0]?.id;
+  const photo = storeId ? STORE_PHOTOS[storeId] : undefined;
 
   return (
     <div className="stack-lg">
-      <HeroHeader title="Espace vendeur">
-        <div className="cluster" style={{ marginTop: 14, flexWrap: 'nowrap' }}>
-          <span className="avatar" style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}><Icon name="store" size={26} /></span>
-          <span>
-            <strong style={{ display: 'block', fontSize: '1.1rem' }}>{me.businessName}</strong>
-            <span className="cluster" style={{ gap: 4, color: '#4ade80', fontWeight: 700, fontSize: '0.9rem' }}><Icon name="shield" size={16} />Boutique vérifiée</span>
+      <div className="vendor-top night">
+        <div className="vendor-bar">
+          <button className="round-btn" aria-label="Retour"
+            onClick={() => (window.history.length > 1 ? router.back() : router.push('/profil'))}>
+            <Icon name="back" size={20} />
+          </button>
+          <h1>Espace vendeur</h1>
+          <a className="round-btn" href="#commandes"
+            aria-label={toAccept ? `${toAccept} commande${toAccept > 1 ? 's' : ''} à accepter` : 'Aucune nouvelle commande'}>
+            <Icon name="bell" size={20} />
+            {toAccept > 0 && <span className="tab-badge" aria-hidden="true">{toAccept}</span>}
+          </a>
+        </div>
+      </div>
+
+      <section className="vendor-sheet stack" aria-label="Ma boutique">
+        <div className="store-id">
+          <span className="store-avatar">
+            {photo ? <img src={photo} alt="" /> : <Icon name="store" size={30} />}
+          </span>
+          <span style={{ minWidth: 0 }}>
+            <strong className="store-id-name">{me.businessName}</strong>
+            <span className="verified"><Icon name="shield" size={16} />Boutique vérifiée</span>
           </span>
         </div>
         <div className="stats">
-          <div className="stat"><span className="num">{orders?.length ?? '…'}</span><span className="stat-label">Commandes</span></div>
-          <div className="stat"><span className="num">{fcfaShort(month.total)}</span><span className="stat-label">Ventes du mois</span></div>
-          <div className="stat"><span className="num">{orders ? todo : '…'}</span><span className="stat-label">À traiter</span></div>
+          <div className="stat"><span className="num">{orders ? orders.length : '…'}</span><span className="stat-label">Commandes</span></div>
+          <div className="stat"><span className="num">{orders ? compactAmount(sales) : '…'}</span><span className="stat-label">FCFA ventes</span></div>
+          <div className="stat"><span className="num">{acceptRate === null ? '—' : `${acceptRate} %`}</span><span className="stat-label">Taux d’acceptation</span></div>
         </div>
-      </HeroHeader>
+      </section>
 
       <section className="dark-card" aria-label="Revenus du mois">
         <div className="split">
           <span style={{ opacity: 0.85 }}>Revenus du mois</span>
-          {month.trend !== null && (
-            <span className="trend" style={month.trend < 0 ? { color: '#fca5a5' } : undefined}>
-              <Icon name="trend" size={16} />{month.trend >= 0 ? '+' : ''}{month.trend}&nbsp;%
-            </span>
-          )}
         </div>
-        <span className="num">{fcfa(month.total)}</span>
-        <Sparkline values={month.daily} label={`Ventes terminées par jour ce mois-ci, ${fcfa(month.total)} au total`} />
-        <p className="small" style={{ opacity: 0.7, marginTop: 4 }}>Commandes terminées, calculées sur vos 100 dernières commandes.</p>
+        <span className="num">{month.total.toLocaleString('fr-FR').replace(/ |\s/g, ' ')}&nbsp;FCFA</span>
+        {month.trend !== null && (
+          <span className="trend" style={month.trend < 0 ? { color: '#fca5a5' } : undefined}>
+            <Icon name="trend" size={16} />{month.trend >= 0 ? '+' : ''}{month.trend}&nbsp;%
+          </span>
+        )}
+        <Sparkline color="#4ade80" values={month.daily} label={`Ventes terminées par jour ce mois-ci, ${fcfa(month.total)} au total`} />
+        <p className="small" style={{ opacity: 0.7, marginTop: 4 }}>Commandes terminées ce mois-ci, sur vos 100 dernières commandes.</p>
       </section>
 
       <nav className="menu-grid" aria-label="Gérer mon activité">
