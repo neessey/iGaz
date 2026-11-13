@@ -8,13 +8,15 @@ import { bottlePhoto } from '@/lib/media';
  */
 const HEIGHT: Record<number, number> = { 3: 58, 6: 74, 12: 98 };
 
-export function Cylinder({ kg, color = '#5b3fd0', scale = 1, className, brand }: {
+export function Cylinder({ kg, color = '#5b3fd0', scale = 1, className, brand, photo: own }: {
   kg: number; color?: string; scale?: number; className?: string; brand?: string;
+  /** Photo envoyée par le dépôt (lib/media.ts, productPhoto) : prioritaire. */
+  photo?: string | null;
 }) {
   const id = useId().replace(/:/g, '');
   const h = HEIGHT[kg] ?? Math.round(40 + kg * 5);
   const w = 44;
-  const photo = bottlePhoto(kg, brand);
+  const photo = own ?? bottlePhoto(kg, brand);
   if (photo) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={photo} alt="" className={className} style={{ height: h * scale, width: 'auto', objectFit: 'contain' }} />;

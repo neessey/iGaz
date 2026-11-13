@@ -1,5 +1,8 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
+import {
+  Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, Res,
+} from '@nestjs/common';
 import { Role, User } from '@prisma/client';
+import type { Request, Response } from 'express';
 import { CurrentUser, Public, Roles } from '../common/decorators';
 import {
   AdminSetStockDto, CreateProductDto, SearchProductsQuery, SetStockDto, UpdateProductDto,
@@ -52,6 +55,39 @@ export class ProductsController {
     @Body() dto: SetStockDto,
   ) {
     return this.products.setStock(user, storeId, productId, dto.quantity);
+  }
+
+  /** Corps : l'image elle-même (Content-Type image/jpeg, image/png ou image/webp), pas du JSON. */
+  @Roles(Role.SUPPLIER) @Put('stores/:storeId/products/:productId/photo')
+  setPhoto(
+    @CurrentUser() user: User,
+    @Param('storeId', ParseUUIDPipe) storeId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Req() req: Request,
+  ) {
+    return this.products.setPhoto(user, storeId, productId, Buffer.isBuffer(req.body) ? req.body : undefined, req.headers['content-type']);
+  }
+
+  @Roles(Role.SUPPLIER) @Delete('stores/:storeId/products/:productId/photo') @HttpCode(204)
+  removePhoto(
+    @CurrentUser() user: User,
+    @Param('storeId', ParseUUIDPipe) storeId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+  ) {
+    return this.products.removePhoto(user, storeId, productId);
+  }
+
+  /** L'adresse contient la version (?v=date de la photo) : le navigateur peut la garder en cache sans limite. */
+  @Public() @Get('products/:id/photo')
+  async photo(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+    const photo = await this.products.photo(id);
+    res.set({
+      'Content-Type': photo.mime,
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'",
+    });
+    res.send(Buffer.from(photo.data));
   }
 
   @Roles(Role.SUPPLIER) @Get('stores/:storeId/products/:productId/movements')

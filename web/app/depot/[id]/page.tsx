@@ -10,7 +10,7 @@ import { Empty, Loading, Notice } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { fcfa, phoneFmt } from '@/lib/format';
-import { brandColor } from '@/lib/media';
+import { brandColor, productPhoto } from '@/lib/media';
 import { useSession } from '@/lib/session';
 import { closesSoon, groupByStore } from '@/lib/stores';
 import { Offer } from '@/lib/types';
@@ -98,7 +98,7 @@ function StorePage() {
               return (
                 <div key={o.id} className="menu-row">
                   <span className="offer-media" style={{ width: 64, height: 64 }}>
-                    <Cylinder brand={o.brand.name} kg={o.cylinderType.capacityKg} color={brandColor(o.brand.name)} scale={o.cylinderType.capacityKg >= 12 ? 0.55 : 0.66} />
+                    <Cylinder photo={productPhoto(o)} brand={o.brand.name} kg={o.cylinderType.capacityKg} color={brandColor(o.brand.name)} scale={o.cylinderType.capacityKg >= 12 ? 0.55 : 0.66} />
                   </span>
                   <span style={{ minWidth: 0 }}>
                     <Link href={`/produit/${o.id}`} style={{ color: 'inherit', textDecoration: 'none', fontWeight: 800, display: 'block' }}>{o.brand.name} {o.cylinderType.label}</Link>

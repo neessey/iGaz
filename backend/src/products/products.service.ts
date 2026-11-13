@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { isStoreOpenNow } from '../orders/order-rules';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
+import { photoError, sniffPhotoType } from './photo-rules';
 import { CreateProductDto, SearchProductsQuery, UpdateProductDto } from './products.dto';
 
 @Injectable()
@@ -78,6 +79,41 @@ export class ProductsService {
     if (!found) throw new NotFoundException('Produit introuvable');
     return this.prisma.$transaction((tx) =>
       this.applyStock(tx, productId, quantity, 'SUPPLIER_UPDATE', user.id).then((r) => r.inventory));
+  }
+
+  /** Photo du produit, envoyée par son dépôt (remplace la précédente). Produit d'un autre dépôt : 404. */
+  async setPhoto(user: User, storeId: string, productId: string, data: Buffer | undefined, declaredType: string | undefined) {
+    await this.suppliers.requireOwnedStore(user, storeId);
+    const found = await this.prisma.product.findFirst({ where: { id: productId, storeId } });
+    if (!found) throw new NotFoundException('Produit introuvable');
+    const error = photoError(data, declaredType);
+    if (error) throw new BadRequestException(error);
+    const bytes = Uint8Array.from(data!);
+    const mime = sniffPhotoType(bytes)!;
+    const [, product] = await this.prisma.$transaction([
+      this.prisma.productPhoto.upsert({
+        where: { productId }, create: { productId, mime, data: bytes }, update: { mime, data: bytes },
+      }),
+      this.prisma.product.update({ where: { id: productId }, data: { photoUpdatedAt: new Date() }, select: { id: true, photoUpdatedAt: true } }),
+    ]);
+    return product;
+  }
+
+  async removePhoto(user: User, storeId: string, productId: string) {
+    await this.suppliers.requireOwnedStore(user, storeId);
+    const found = await this.prisma.product.findFirst({ where: { id: productId, storeId } });
+    if (!found) throw new NotFoundException('Produit introuvable');
+    await this.prisma.$transaction([
+      this.prisma.productPhoto.deleteMany({ where: { productId } }),
+      this.prisma.product.update({ where: { id: productId }, data: { photoUpdatedAt: null } }),
+    ]);
+  }
+
+  /** Photo publique d'un produit (les mêmes informations que la fiche produit, déjà publique). */
+  async photo(productId: string) {
+    const photo = await this.prisma.productPhoto.findUnique({ where: { productId } });
+    if (!photo) throw new NotFoundException('Pas de photo pour ce produit');
+    return photo;
   }
 
   async listForStore(user: User, storeId: string) {

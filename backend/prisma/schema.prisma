@@ -229,9 +229,11 @@ model Product {
   purchasePrice  Int // bouteille pleine sans retour
   exchangePrice  Int // bouteille pleine contre une vide compatible
   isActive       Boolean  @default(true)
+  photoUpdatedAt DateTime? // date de la photo envoyée par le dépôt (null : pas de photo) ; sert de version dans l'adresse
   createdAt      DateTime @default(now())
 
   store        Store        @relation(fields: [storeId], references: [id])
+  photo        ProductPhoto?
   brand        GasBrand     @relation(fields: [brandId], references: [id])
   cylinderType CylinderType @relation(fields: [cylinderTypeId], references: [id])
   inventory    Inventory?
@@ -239,6 +241,17 @@ model Product {
   orderItems   OrderItem[]
 
   @@unique([storeId, brandId, cylinderTypeId])
+}
+
+/// Photo d'un produit, envoyée par le dépôt (déjà réduite par l'application : quelques dizaines de Ko). Gardée en base,
+/// à part du produit pour que les listes ne la chargent pas ; servie par GET /products/:id/photo.
+model ProductPhoto {
+  productId String   @id
+  mime      String // image/jpeg, image/png ou image/webp
+  data      Bytes
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 model Inventory {

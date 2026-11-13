@@ -8,7 +8,7 @@ import { Loading, Notice } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { fcfa, phoneFmt } from '@/lib/format';
-import { brandColor, IMAGES } from '@/lib/media';
+import { brandColor, IMAGES, productPhoto } from '@/lib/media';
 import { useSession } from '@/lib/session';
 import { Offer } from '@/lib/types';
 
@@ -68,7 +68,7 @@ function ProductPage() {
         <Link href="/" className="back" aria-label="Retour aux dépôts"><Icon name="back" size={20} /></Link>
         {IMAGES.productHero && <img src={IMAGES.productHero} alt="" />}
         <span style={{ position: 'relative', marginBottom: 36 }}>
-          <Cylinder brand={offer.brand.name} kg={offer.cylinderType.capacityKg} color={brandColor(offer.brand.name)} scale={offer.cylinderType.capacityKg >= 12 ? 1.9 : 2.3} />
+          <Cylinder photo={productPhoto(offer)} brand={offer.brand.name} kg={offer.cylinderType.capacityKg} color={brandColor(offer.brand.name)} scale={offer.cylinderType.capacityKg >= 12 ? 1.9 : 2.3} />
         </span>
       </div>
 

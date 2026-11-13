@@ -202,6 +202,33 @@ describe('iGaz MVP — parcours complet', () => {
     await http().patch(`/suppliers/me/stores/${ids.storeA}`).set(auth('supB')).send({ deliveryFee: 0 }).expect(404);
   });
 
+  it('photo du produit : envoyée par son dépôt seulement, servie à tous, contrôlée', async () => {
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(200, 7)]);
+    const url = `/stores/${ids.storeA}/products/${ids.prodA}/photo`;
+    await http().get(`/products/${ids.prodA}/photo`).expect(404);
+    // Un autre dépôt ne peut ni envoyer ni retirer la photo (404, comme pour le reste de la boutique)
+    await http().put(url).set(auth('supB')).set('Content-Type', 'image/png').send(png).expect(404);
+    await http().put(url).set('Content-Type', 'image/png').send(png).expect(401);
+    // Contenu qui n'est pas une image, ou type annoncé faux
+    await http().put(url).set(auth('supA')).set('Content-Type', 'image/png').send(Buffer.from('<svg onload=alert(1)>')).expect(400);
+    await http().put(url).set(auth('supA')).set('Content-Type', 'image/jpeg').send(png).expect(400);
+
+    const put = await http().put(url).set(auth('supA')).set('Content-Type', 'image/png').send(png).expect(200);
+    expect(put.body.photoUpdatedAt).toBeTruthy();
+    const got = await http().get(`/products/${ids.prodA}/photo`).buffer(true).expect(200);
+    expect(got.headers['content-type']).toBe('image/png');
+    expect(got.headers['x-content-type-options']).toBe('nosniff');
+    expect(Buffer.compare(got.body as Buffer, png)).toBe(0);
+    // La recherche donne la version de la photo, pour construire son adresse
+    const offers = await http().get(`/products?storeId=${ids.storeA}`).expect(200);
+    expect(offers.body.find((o: any) => o.id === ids.prodA).photoUpdatedAt).toBe(put.body.photoUpdatedAt);
+
+    await http().delete(url).set(auth('supB')).expect(404);
+    await http().delete(url).set(auth('supA')).expect(204);
+    await http().get(`/products/${ids.prodA}/photo`).expect(404);
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: ids.prodA } })).photoUpdatedAt).toBeNull();
+  });
+
   // ----------------------------------------------------------------- recherche
   it('la recherche ne propose que des offres réellement commandables', async () => {
     let res = await http().get(`/products?zoneId=${ids.cocody}`).expect(200);

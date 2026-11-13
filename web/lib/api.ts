@@ -1,4 +1,4 @@
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+export const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 const TOKEN_KEY = 'igaz.token';
 /**
  * Démo en ligne protégée : clé envoyée à l'API pour qu'elle affiche le code de connexion (pas de SMS réel).
@@ -29,7 +29,10 @@ export function setToken(token: string | null) {
   }
 }
 
-/** Appel JSON vers l'API. Les erreurs de validation de l'API sont déjà rédigées en français. */
+/**
+ * Appel vers l'API : corps JSON, ou image envoyée telle quelle (Blob). Les erreurs de validation de l'API sont déjà
+ * rédigées en français.
+ */
 export async function api<T = unknown>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
   const token = getToken();
   let res: Response;
@@ -37,11 +40,11 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
     res = await fetch(`${API}${path}`, {
       method: init.method ?? (init.body ? 'POST' : 'GET'),
       headers: {
-        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(init.body ? { 'Content-Type': init.body instanceof Blob ? init.body.type : 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(DEMO_KEY && path === '/auth/otp/request' ? { 'x-igaz-demo': DEMO_KEY } : {}),
       },
-      body: init.body ? JSON.stringify(init.body) : undefined,
+      body: init.body instanceof Blob ? init.body : init.body ? JSON.stringify(init.body) : undefined,
     });
   } catch {
     throw new ApiError(0, "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.");

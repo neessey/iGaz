@@ -22,6 +22,8 @@ export interface CartLine {
   capacityKg: number;
   storeId: string;
   storeName: string;
+  /** Photo du produit envoyée par le dépôt, au moment de l'ajout. */
+  photo?: string | null;
 }
 
 export interface CartGroup { storeId: string; storeName: string; lines: CartLine[]; subtotal: number }

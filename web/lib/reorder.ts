@@ -1,5 +1,6 @@
 import { api } from './api';
 import { CartLine } from './cart';
+import { productPhoto } from './media';
 import { Offer, Order } from './types';
 
 /**
@@ -20,7 +21,7 @@ export async function reorder(order: Order, add: (line: CartLine) => string | nu
       unitPrice: item.kind === 'EXCHANGE' ? offer.exchangePrice : offer.purchasePrice, maxQty,
       brandId: offer.brandId, brandName: offer.brand.name, cylinderTypeId: offer.cylinderTypeId,
       label: offer.cylinderType.label, capacityKg: offer.cylinderType.capacityKg,
-      storeId: offer.store.id, storeName: offer.store.name,
+      storeId: offer.store.id, storeName: offer.store.name, photo: productPhoto(offer),
     });
     if (problem) return { added, missing, error: problem };
     added.push(name);

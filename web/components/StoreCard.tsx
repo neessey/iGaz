@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ReactNode } from 'react';
 import { fcfa } from '@/lib/format';
-import { brandColor, STORE_PHOTOS } from '@/lib/media';
+import { brandColor, productPhoto, STORE_PHOTOS } from '@/lib/media';
 import { closesSoon, StoreSummary } from '@/lib/stores';
 import { Cylinder } from './Cylinder';
 import { Icon } from './Icon';
@@ -17,7 +17,7 @@ export function StoreCover({ summary, children, className = '' }: { summary: Sto
     <div className={`store-cover ${className}`}>
       {photo
         ? <img className="photo" src={photo} alt="" />
-        : bottles.map((o) => <Cylinder key={o.id} brand={o.brand.name} kg={o.cylinderType.capacityKg} color={brandColor(o.brand.name)} scale={0.62} />)}
+        : bottles.map((o) => <Cylinder key={o.id} photo={productPhoto(o)} brand={o.brand.name} kg={o.cylinderType.capacityKg} color={brandColor(o.brand.name)} scale={0.62} />)}
       {children}
     </div>
   );

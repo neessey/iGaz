@@ -2,17 +2,23 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Cylinder } from '@/components/Cylinder';
+import { PhotoPicker } from '@/components/PhotoPicker';
 import { Guard } from '@/components/Shell';
 import { Empty, Field, Loading, Notice, PageHead } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
 import { fcfa } from '@/lib/format';
-import { brandColor } from '@/lib/media';
+import { brandColor, productPhoto } from '@/lib/media';
+import { shrinkPhoto } from '@/lib/photo';
 import { Brand, Cylinder as CylinderType } from '@/lib/types';
 
 interface Product {
   id: string; purchasePrice: number; exchangePrice: number; isActive: boolean;
-  brand: Brand; cylinderType: CylinderType; inventory: { quantity: number } | null;
+  brand: Brand; cylinderType: CylinderType; inventory: { quantity: number } | null; photoUpdatedAt: string | null;
 }
+
+/** Réduit la photo dans le téléphone, puis l'envoie à l'API (corps : l'image elle-même). */
+const uploadPhoto = async (storeId: string, productId: string, file: File) =>
+  api(`/stores/${storeId}/products/${productId}/photo`, { method: 'PUT', body: await shrinkPhoto(file) });
 
 function Row({ storeId, product, onChange }: { storeId: string; product: Product; onChange: () => void }) {
   const current = product.inventory?.quantity ?? 0;
@@ -37,7 +43,7 @@ function Row({ storeId, product, onChange }: { storeId: string; product: Product
   return (
     <article className="card stack-sm" style={{ opacity: product.isActive ? 1 : 0.6 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr', gap: 14, alignItems: 'center' }}>
-        <span className="offer-media" style={{ width: 64, height: 64 }}><Cylinder brand={product.brand.name} kg={product.cylinderType.capacityKg} color={brandColor(product.brand.name)} scale={0.55} /></span>
+        <span className="offer-media" style={{ width: 64, height: 64 }}><Cylinder photo={productPhoto(product)} brand={product.brand.name} kg={product.cylinderType.capacityKg} color={brandColor(product.brand.name)} scale={0.55} /></span>
         <div>
           <h3>{product.brand.name} {product.cylinderType.label}</h3>
           <p className="small muted">Achat {fcfa(product.purchasePrice)}, échange {fcfa(product.exchangePrice)}{product.isActive ? '' : '. Masqué aux clients'}</p>
@@ -63,6 +69,14 @@ function Row({ storeId, product, onChange }: { storeId: string; product: Product
           onClick={() => run(() => api(base, { method: 'PATCH', body: { isActive: !product.isActive } }), product.isActive ? 'Produit masqué' : 'Produit visible')}>
           {product.isActive ? 'Masquer' : 'Remettre en vente'}
         </button>
+        <PhotoPicker label={product.photoUpdatedAt ? 'Changer la photo' : 'Ajouter une photo'} disabled={busy}
+          onPick={(file) => run(() => uploadPhoto(storeId, product.id, file), 'Photo enregistrée')} />
+        {product.photoUpdatedAt && (
+          <button className="btn btn-quiet btn-small" disabled={busy}
+            onClick={() => run(() => api(`${base}/photo`, { method: 'DELETE' }), 'Photo retirée')}>
+            Retirer la photo
+          </button>
+        )}
       </div>
       {editing && (
         <div className="stack-sm panel panel-flag">
@@ -88,14 +102,20 @@ function AddProduct({ storeId, brands, cylinders, onAdded }: { storeId: string; 
   const [purchasePrice, setPurchase] = useState(7500);
   const [exchangePrice, setExchange] = useState(1500);
   const [quantity, setQuantity] = useState(0);
+  const [photo, setPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function add() {
     setBusy(true); setError(null);
     try {
-      await api(`/stores/${storeId}/products`, { body: { brandId, cylinderTypeId, purchasePrice, exchangePrice, quantity } });
+      const created = await api<{ id: string }>(`/stores/${storeId}/products`, { body: { brandId, cylinderTypeId, purchasePrice, exchangePrice, quantity } });
       setBrandId(''); setCylinderTypeId(''); setQuantity(0);
+      if (photo) {
+        setPhoto(null);
+        try { await uploadPhoto(storeId, created.id, photo); }
+        catch (e) { setError(`Produit ajouté, mais la photo n’a pas été enregistrée : ${errorText(e)} Réessayez depuis la liste.`); }
+      }
       onAdded();
     } catch (e) { setError(errorText(e)); }
     finally { setBusy(false); }
@@ -119,6 +139,14 @@ function AddProduct({ storeId, brands, cylinders, onAdded }: { storeId: string; 
       <div className="cluster" style={{ alignItems: 'flex-end' }}>
         <Field label="Prix d’achat (F)"><input className="input" type="number" min={0} step={50} value={purchasePrice} onChange={(e) => setPurchase(Number(e.target.value))} /></Field>
         <Field label="Prix d’échange (F)"><input className="input" type="number" min={0} step={50} value={exchangePrice} onChange={(e) => setExchange(Number(e.target.value))} /></Field>
+      </div>
+      <div className="stack-sm">
+        <span className="label" style={{ fontWeight: 700, fontSize: '0.9rem' }}>Photo de la bouteille (facultatif)</span>
+        <div className="cluster">
+          <PhotoPicker label={photo ? 'Changer la photo' : 'Ajouter une photo'} onPick={setPhoto} disabled={busy} />
+          {photo && <span className="small muted">{photo.name}</span>}
+        </div>
+        <p className="small muted">Prenez la bouteille de face, sur un fond uni. Sans photo, une illustration est affichée.</p>
       </div>
       <Field label="Quantité en stock"><input className="input" type="number" min={0} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ maxWidth: 160 }} /></Field>
       {error && <Notice kind="error">{error}</Notice>}

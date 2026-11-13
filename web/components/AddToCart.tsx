@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useCart } from '@/lib/cart';
 import { fcfa } from '@/lib/format';
-import { brandColor } from '@/lib/media';
+import { brandColor, productPhoto } from '@/lib/media';
 import { Offer } from '@/lib/types';
 import { Cylinder } from './Cylinder';
 import { Sheet } from './Sheet';
@@ -27,7 +27,7 @@ export function AddToCartSheet({ offer, onClose, onAdded }: { offer: Offer; onCl
       productId: offer.id, kind, quantity: qty, unitPrice: unit, maxQty,
       brandId: offer.brandId, brandName: offer.brand.name,
       cylinderTypeId: offer.cylinderTypeId, label: offer.cylinderType.label, capacityKg: offer.cylinderType.capacityKg,
-      storeId: offer.store.id, storeName: offer.store.name,
+      storeId: offer.store.id, storeName: offer.store.name, photo: productPhoto(offer),
     });
     if (problem) { setError(problem); return; }
     onAdded(`${qty} × ${name} ajouté${qty > 1 ? 's' : ''} au panier`);
@@ -38,7 +38,7 @@ export function AddToCartSheet({ offer, onClose, onAdded }: { offer: Offer; onCl
     <Sheet title={`Ajouter ${name}`} onClose={onClose}>
       <div className="cluster" style={{ flexWrap: 'nowrap', gap: 14 }}>
         <span className="offer-media" style={{ width: 72, height: 72 }}>
-          <Cylinder brand={offer.brand.name} kg={offer.cylinderType.capacityKg} color={brandColor(offer.brand.name)} scale={offer.cylinderType.capacityKg >= 12 ? 0.62 : 0.78} />
+          <Cylinder photo={productPhoto(offer)} brand={offer.brand.name} kg={offer.cylinderType.capacityKg} color={brandColor(offer.brand.name)} scale={offer.cylinderType.capacityKg >= 12 ? 0.62 : 0.78} />
         </span>
         <span>
           <strong style={{ display: 'block', fontSize: '1.15rem' }}>{name}</strong>

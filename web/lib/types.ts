@@ -11,6 +11,8 @@ export interface StoreLite {
 export interface Offer {
   id: string; purchasePrice: number; exchangePrice: number; brandId: string; cylinderTypeId: string;
   brand: Brand; cylinderType: Cylinder; inventory: { quantity: number } | null; store: StoreLite; available?: boolean;
+  /** Date de la photo envoyée par le dépôt (null : pas de photo). */
+  photoUpdatedAt?: string | null;
 }
 export type OrderStatus =
   | 'PENDING_PAYMENT' | 'SUBMITTED' | 'ACCEPTED' | 'READY_FOR_PICKUP' | 'OUT_FOR_DELIVERY'
@@ -22,7 +24,7 @@ export interface Order {
   client?: { name: string | null; phone: string };
   store: { id: string; name: string; address: string; phone: string };
   items: { id: string; productId: string; kind: 'PURCHASE' | 'EXCHANGE'; quantity: number; unitPrice: number;
-    product: { brand: Brand; cylinderType: Cylinder } }[];
+    product: { id: string; photoUpdatedAt?: string | null; brand: Brand; cylinderType: Cylinder } }[];
   events: { id: string; status: OrderStatus; note: string | null; createdAt: string }[];
   payments: { id: string; method: string; amount: number; status: string }[];
   /** Payée en ligne (paiement propre ou paiement du panier). */

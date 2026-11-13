@@ -1,3 +1,5 @@
+import { API } from './api';
+
 /**
  * Photos et logos d'iGaz. Tant qu'un fichier n'est pas fourni, l'interface affiche une illustration dessinée.
  *
@@ -18,10 +20,26 @@ export const BRAND_LOGOS: Record<string, string> = {};
  * marque et une taille (ex. 'soleil gaz|6': '/images/bouteilles/soleil-gaz-6.png'), ou « kg » seul pour une photo
  * générique de la taille (ex. '12': '/images/bouteilles/b12.png'). Sans photo : bouteille dessinée.
  */
-export const BOTTLE_PHOTOS: Record<string, string> = {};
+export const BOTTLE_PHOTOS: Record<string, string> = {
+  // Photos fournies par iGaz (originaux dans docs/photos/bouteilles, détourées par npm run bottles).
+  'petroci|6': '/images/bouteilles/petroci-6.webp',
+  'petroci|12': '/images/bouteilles/petroci-12.webp',
+  'pétro ivoire|6': '/images/bouteilles/petro-ivoire-6.webp',
+  'petro ivoire|6': '/images/bouteilles/petro-ivoire-6.webp',
+  'pétro ivoire|12': '/images/bouteilles/petro-ivoire-12.webp',
+  'petro ivoire|12': '/images/bouteilles/petro-ivoire-12.webp',
+  'totalenergies|12': '/images/bouteilles/totalenergies-12.webp',
+  'total|12': '/images/bouteilles/totalenergies-12.webp',
+  'shell|12': '/images/bouteilles/shell-12.webp',
+  'shell gas|12': '/images/bouteilles/shell-12.webp',
+};
 
 export const bottlePhoto = (kg: number, brand?: string) =>
   (brand ? BOTTLE_PHOTOS[`${brand.trim().toLowerCase()}|${kg}`] : undefined) ?? BOTTLE_PHOTOS[String(kg)] ?? null;
+
+/** Photo envoyée par le dépôt pour ce produit (prioritaire sur BOTTLE_PHOTOS), ou null. */
+export const productPhoto = (p: { id: string; photoUpdatedAt?: string | null }) =>
+  p.photoUpdatedAt ? `${API}/products/${p.id}/photo?v=${encodeURIComponent(p.photoUpdatedAt)}` : null;
 
 /** Photos des dépôts, par identifiant de boutique (en attendant un champ photo dans l'API). */
 export const STORE_PHOTOS: Record<string, string> = {};

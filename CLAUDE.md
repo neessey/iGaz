@@ -47,7 +47,10 @@ Police Plus Jakarta Sans. Barre d'onglets en bas selon le rôle (`components/She
 `components/Icon.tsx`. Les jetons de couleur sont dans `app/globals.css` : ne pas écrire de couleur en dur dans les pages.
 Bouteilles dessinées à la couleur de la marque, hauteur proportionnelle à la capacité (`components/Cylinder.tsx`).
 Photos et logos de marques : seulement ceux fournis par iGaz (droits d'usage), déclarés dans `web/lib/media.ts` ; sans
-fichier, l'interface affiche une illustration. Boutons d'au moins 44 px, pas d'animation d'entrée, français simple, verbes d'action.
+fichier, l'interface affiche une illustration. Photos de bouteilles par marque et taille : originaux dans
+`docs/photos/bouteilles/<marque>-<kg>.*`, détourés par `npm run bottles`, déclarés dans `BOTTLE_PHOTOS`. Le dépôt peut
+envoyer la photo de chacun de ses produits (`PUT /stores/:id/products/:id/photo`, image brute réduite par le téléphone,
+gardée en base dans `ProductPhoto`, règles dans `photo-rules.ts`) : elle passe avant `BOTTLE_PHOTOS`. Boutons d'au moins 44 px, pas d'animation d'entrée, français simple, verbes d'action.
 
 ## Commandes du backend (depuis `backend/`)
 
