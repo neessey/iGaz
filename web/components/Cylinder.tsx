@@ -2,11 +2,11 @@ import { useId } from 'react';
 import { bottlePhoto } from '@/lib/media';
 
 /**
- * Bouteille de gaz dessinée, à la couleur de la marque. La hauteur suit la capacité (B3 < B6 < B12) :
- * on reconnaît la taille d'un coup d'œil. Si une photo est déclarée (lib/media.ts, BOTTLE_PHOTOS), elle remplace
+ * Bouteille de gaz dessinée, à la couleur de la marque. La hauteur suit la capacité  :
+ * on reconnaît la taille d'un coup d'œil (B6 < B12 < B24 < B28). Si une photo est déclarée (lib/media.ts, BOTTLE_PHOTOS), elle remplace
  * le dessin, à la même hauteur.
  */
-const HEIGHT: Record<number, number> = { 3: 58, 6: 74, 12: 98 };
+const HEIGHT: Record<number, number> = { 6: 74, 12: 98, 24: 112, 28: 120 };
 
 export function Cylinder({ kg, color = '#5b3fd0', scale = 1, className, brand, photo: own }: {
   kg: number; color?: string; scale?: number; className?: string; brand?: string;

@@ -202,6 +202,17 @@ describe('iGaz MVP — parcours complet', () => {
     await http().patch(`/suppliers/me/stores/${ids.storeA}`).set(auth('supB')).send({ deliveryFee: 0 }).expect(404);
   });
 
+  it('format retiré du catalogue : absent du catalogue, de la recherche et du stock du dépôt', async () => {
+    const listed = async () => (await http().get(`/stores/${ids.storeA}/products`).set(auth('supA')).expect(200)).body.map((p: any) => p.id);
+    expect(await listed()).toContain(ids.prodA12);
+    await http().patch(`/admin/cylinder-types/${ids.b12}`).set(auth('admin')).send({ isActive: false }).expect(200);
+    expect(await listed()).not.toContain(ids.prodA12);
+    expect((await http().get('/catalog/cylinder-types').expect(200)).body.map((c: any) => c.id)).not.toContain(ids.b12);
+    expect((await http().get(`/products?cylinderTypeId=${ids.b12}`).expect(200)).body).toHaveLength(0);
+    await http().patch(`/admin/cylinder-types/${ids.b12}`).set(auth('admin')).send({ isActive: true }).expect(200);
+    expect(await listed()).toContain(ids.prodA12);
+  });
+
   it('photo du produit : envoyée par son dépôt seulement, servie à tous, contrôlée', async () => {
     const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(200, 7)]);
     const url = `/stores/${ids.storeA}/products/${ids.prodA}/photo`;

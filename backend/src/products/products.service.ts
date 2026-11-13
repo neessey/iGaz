@@ -119,7 +119,8 @@ export class ProductsService {
   async listForStore(user: User, storeId: string) {
     await this.suppliers.requireOwnedStore(user, storeId);
     return this.prisma.product.findMany({
-      where: { storeId },
+      // Format retiré du catalogue (ex. B3) : ses produits ne sont plus vendus, le dépôt ne les voit plus.
+      where: { storeId, cylinderType: { isActive: true } },
       include: { brand: true, cylinderType: true, inventory: true },
       orderBy: { createdAt: 'asc' },
     });

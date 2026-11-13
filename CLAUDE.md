@@ -60,7 +60,7 @@ gardée en base dans `ProductPhoto`, règles dans `photo-rules.ts`) : elle passe
   base `igaz_test` sur le PostgreSQL du docker-compose (`CREATE DATABASE igaz_test`, puis `prisma migrate deploy` avec
   `DATABASE_URL` pointant dessus), et `TEST_DATABASE_URL=postgresql://igaz:igaz@127.0.0.1:5432/igaz_test`. Jamais la base `igaz`.
 - `npx prisma migrate dev --name <nom>` — toute modification de `prisma/schema.prisma` passe par une migration
-- `npm run seed` — communes d'Abidjan, formats B3/B6/B12, compte admin (`ADMIN_PHONE`)
+- `npm run seed` — communes d'Abidjan, formats B6/B12/B24/B28 (B3 retiré, désactivé), compte admin (`ADMIN_PHONE`)
 
 ## Règles à ne jamais casser
 

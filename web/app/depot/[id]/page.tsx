@@ -36,7 +36,7 @@ function StorePage() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const summary = useMemo(() => (offers && offers.length ? groupByStore(offers)[0] : null), [offers]);
+  const summary = useMemo(() => (offers && offers.length ? groupByStore(offers, true)[0] : null), [offers]);
   const bySize = useMemo(() => {
     const map = new Map<string, Offer[]>();
     for (const o of [...(offers ?? [])].sort((a, b) => a.cylinderType.capacityKg - b.cylinderType.capacityKg || a.purchasePrice - b.purchasePrice)) {

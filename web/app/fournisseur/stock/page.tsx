@@ -99,8 +99,8 @@ function Row({ storeId, product, onChange }: { storeId: string; product: Product
 function AddProduct({ storeId, brands, cylinders, onAdded }: { storeId: string; brands: Brand[]; cylinders: CylinderType[]; onAdded: () => void }) {
   const [brandId, setBrandId] = useState('');
   const [cylinderTypeId, setCylinderTypeId] = useState('');
-  const [purchasePrice, setPurchase] = useState(7500);
-  const [exchangePrice, setExchange] = useState(1500);
+  const [purchasePrice, setPurchase] = useState(12000);
+  const [exchangePrice, setExchange] = useState(2200);
   const [quantity, setQuantity] = useState(0);
   const [photo, setPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);

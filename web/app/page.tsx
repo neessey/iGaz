@@ -60,7 +60,8 @@ export default function Home() {
     const matching = q
       ? offers.filter((o) => [o.brand.name, o.cylinderType.label, o.store.name, o.store.address].some((s) => s.toLowerCase().includes(q)))
       : offers;
-    return groupByStore(matching);
+    // Prix affiché : la recharge (échange d'une bouteille vide), l'achat le plus courant.
+    return groupByStore(matching, true);
   }, [offers, query]);
 
   const storeHref = (id: string) => `/depot/${id}`;
@@ -95,18 +96,15 @@ export default function Home() {
         <a className="btn" href="#depots">Voir les dépôts <Icon name="chevron" size={18} /></a>
         {!IMAGES.promo && (
           <span className="promo-art" aria-hidden="true">
-            <Cylinder kg={12} color="#1d4ed8" scale={1.25} />
+            <Cylinder kg={12} brand="Pétro Ivoire" color="#1d4ed8" scale={1.25} />
           </span>
         )}
       </section>
 
-      <div className="hscroll cats" role="radiogroup" aria-label="Taille de la bouteille">
-        <button className="cat" role="radio" aria-checked={cylinderId === ''} onClick={() => setCylinderId('')}>
-          <span className="cat-bubble center"><Icon name="grid" size={20} /></span>Tout
-        </button>
+      <div className="hscroll sizes" role="radiogroup" aria-label="Taille de la bouteille">
+        <button className="chip" role="radio" aria-checked={cylinderId === ''} onClick={() => setCylinderId('')}>Tout</button>
         {cylinders.map((c) => (
-          <button key={c.id} className="cat" role="radio" aria-checked={cylinderId === c.id} onClick={() => setCylinderId(c.id)}>
-            <span className="cat-bubble"><Cylinder kg={c.capacityKg} color={cylinderId === c.id ? '#e05a12' : '#8b84b0'} scale={c.capacityKg >= 12 ? 0.38 : 0.48} /></span>
+          <button key={c.id} className="chip" role="radio" aria-checked={cylinderId === c.id} onClick={() => setCylinderId(c.id)}>
             {c.label}
           </button>
         ))}

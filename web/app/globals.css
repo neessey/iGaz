@@ -578,3 +578,8 @@ dl.facts .total { font-weight: 800; font-size: 1.1rem; color: var(--ink); paddin
 .splash-brand .logo-word { font-size: 2rem; }
 .splash-brand .logo-word span { color: var(--orange); }
 .splash-tagline { font-size: 1rem; opacity: 0.85; }
+
+/* Tailles de bouteille sur l'accueil : le nom seul (B6, B12…), sans dessin */
+.sizes { gap: 8px; }
+.sizes .chip { flex: none; min-width: 64px; }
+.stack-lg > .sizes { margin-top: 16px; }
