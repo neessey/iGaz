@@ -68,7 +68,7 @@ function ProductPage() {
         <Link href="/" className="back" aria-label="Retour aux dépôts"><Icon name="back" size={20} /></Link>
         {IMAGES.productHero && <img src={IMAGES.productHero} alt="" />}
         <span style={{ position: 'relative', marginBottom: 36 }}>
-          <Cylinder kg={offer.cylinderType.capacityKg} color={brandColor(offer.brand.name)} scale={offer.cylinderType.capacityKg >= 12 ? 1.9 : 2.3} />
+          <Cylinder brand={offer.brand.name} kg={offer.cylinderType.capacityKg} color={brandColor(offer.brand.name)} scale={offer.cylinderType.capacityKg >= 12 ? 1.9 : 2.3} />
         </span>
       </div>
 

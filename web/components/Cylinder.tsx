@@ -1,15 +1,24 @@
 import { useId } from 'react';
+import { bottlePhoto } from '@/lib/media';
 
 /**
  * Bouteille de gaz dessinée, à la couleur de la marque. La hauteur suit la capacité (B3 < B6 < B12) :
- * on reconnaît la taille d'un coup d'œil.
+ * on reconnaît la taille d'un coup d'œil. Si une photo est déclarée (lib/media.ts, BOTTLE_PHOTOS), elle remplace
+ * le dessin, à la même hauteur.
  */
 const HEIGHT: Record<number, number> = { 3: 58, 6: 74, 12: 98 };
 
-export function Cylinder({ kg, color = '#5b3fd0', scale = 1, className }: { kg: number; color?: string; scale?: number; className?: string }) {
+export function Cylinder({ kg, color = '#5b3fd0', scale = 1, className, brand }: {
+  kg: number; color?: string; scale?: number; className?: string; brand?: string;
+}) {
   const id = useId().replace(/:/g, '');
   const h = HEIGHT[kg] ?? Math.round(40 + kg * 5);
   const w = 44;
+  const photo = bottlePhoto(kg, brand);
+  if (photo) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={photo} alt="" className={className} style={{ height: h * scale, width: 'auto', objectFit: 'contain' }} />;
+  }
   return (
     <svg width={w * scale} height={h * scale} viewBox={`0 0 ${w} ${h}`} className={className} aria-hidden="true" focusable="false">
       <defs>

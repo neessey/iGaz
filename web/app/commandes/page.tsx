@@ -34,7 +34,7 @@ function Orders() {
               <div key={o.id} className="stack-sm">
               <Link href={`/commandes/${o.id}`} className="card offer">
                 <span className="offer-media">
-                  {first && <Cylinder kg={first.product.cylinderType.capacityKg} color={brandColor(first.product.brand.name)} scale={first.product.cylinderType.capacityKg >= 12 ? 0.65 : 0.8} />}
+                  {first && <Cylinder brand={first.product.brand.name} kg={first.product.cylinderType.capacityKg} color={brandColor(first.product.brand.name)} scale={first.product.cylinderType.capacityKg >= 12 ? 0.65 : 0.8} />}
                 </span>
                 <span className="stack-sm" style={{ minWidth: 0 }}>
                   <span className="offer-title" style={{ display: 'block' }}>

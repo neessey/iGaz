@@ -13,6 +13,16 @@ export const IMAGES: Record<'welcome' | 'promo' | 'productHero', string | null> 
 /** Logos des marques de gaz, par nom de marque en minuscules (ex. 'butagaz': '/images/marques/butagaz.png'). */
 export const BRAND_LOGOS: Record<string, string> = {};
 
+/**
+ * Photos des bouteilles (de préférence détourées, fond transparent, format portrait). Clé « marque|kg » pour une
+ * marque et une taille (ex. 'soleil gaz|6': '/images/bouteilles/soleil-gaz-6.png'), ou « kg » seul pour une photo
+ * générique de la taille (ex. '12': '/images/bouteilles/b12.png'). Sans photo : bouteille dessinée.
+ */
+export const BOTTLE_PHOTOS: Record<string, string> = {};
+
+export const bottlePhoto = (kg: number, brand?: string) =>
+  (brand ? BOTTLE_PHOTOS[`${brand.trim().toLowerCase()}|${kg}`] : undefined) ?? BOTTLE_PHOTOS[String(kg)] ?? null;
+
 /** Photos des dépôts, par identifiant de boutique (en attendant un champ photo dans l'API). */
 export const STORE_PHOTOS: Record<string, string> = {};
 

@@ -37,7 +37,7 @@ function Row({ storeId, product, onChange }: { storeId: string; product: Product
   return (
     <article className="card stack-sm" style={{ opacity: product.isActive ? 1 : 0.6 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr', gap: 14, alignItems: 'center' }}>
-        <span className="offer-media" style={{ width: 64, height: 64 }}><Cylinder kg={product.cylinderType.capacityKg} color={brandColor(product.brand.name)} scale={0.55} /></span>
+        <span className="offer-media" style={{ width: 64, height: 64 }}><Cylinder brand={product.brand.name} kg={product.cylinderType.capacityKg} color={brandColor(product.brand.name)} scale={0.55} /></span>
         <div>
           <h3>{product.brand.name} {product.cylinderType.label}</h3>
           <p className="small muted">Achat {fcfa(product.purchasePrice)}, échange {fcfa(product.exchangePrice)}{product.isActive ? '' : '. Masqué aux clients'}</p>

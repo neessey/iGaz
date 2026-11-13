@@ -43,7 +43,7 @@ export default function CartPage() {
             {g.lines.map((l) => (
               <div key={`${l.productId}-${l.kind}`} className="cart-line">
                 <span className="offer-media" style={{ width: 64, height: 64 }}>
-                  <Cylinder kg={l.capacityKg} color={brandColor(l.brandName)} scale={l.capacityKg >= 12 ? 0.55 : 0.65} />
+                  <Cylinder brand={l.brandName} kg={l.capacityKg} color={brandColor(l.brandName)} scale={l.capacityKg >= 12 ? 0.55 : 0.65} />
                 </span>
                 <span className="stack-sm" style={{ minWidth: 0 }}>
                   <strong style={{ display: 'block' }}>{l.brandName} {l.label}</strong>

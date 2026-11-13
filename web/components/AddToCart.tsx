@@ -38,7 +38,7 @@ export function AddToCartSheet({ offer, onClose, onAdded }: { offer: Offer; onCl
     <Sheet title={`Ajouter ${name}`} onClose={onClose}>
       <div className="cluster" style={{ flexWrap: 'nowrap', gap: 14 }}>
         <span className="offer-media" style={{ width: 72, height: 72 }}>
-          <Cylinder kg={offer.cylinderType.capacityKg} color={brandColor(offer.brand.name)} scale={offer.cylinderType.capacityKg >= 12 ? 0.62 : 0.78} />
+          <Cylinder brand={offer.brand.name} kg={offer.cylinderType.capacityKg} color={brandColor(offer.brand.name)} scale={offer.cylinderType.capacityKg >= 12 ? 0.62 : 0.78} />
         </span>
         <span>
           <strong style={{ display: 'block', fontSize: '1.15rem' }}>{name}</strong>

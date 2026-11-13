@@ -7,10 +7,10 @@ import { Bell } from '@/components/Bell';
 import { StoreCard } from '@/components/StoreCard';
 import { Empty, Loading, Notice, SectionHead } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
-import { brandColor, brandLogo, IMAGES, initials } from '@/lib/media';
+import { IMAGES } from '@/lib/media';
 import { useSession } from '@/lib/session';
 import { groupByStore } from '@/lib/stores';
-import { Brand, Cylinder as CylinderType, Offer, Zone } from '@/lib/types';
+import { Cylinder as CylinderType, Offer, Zone } from '@/lib/types';
 
 const ZONE_KEY = 'igaz.zone';
 
@@ -18,19 +18,17 @@ export default function Home() {
   const { user } = useSession();
   const [zones, setZones] = useState<Zone[]>([]);
   const [cylinders, setCylinders] = useState<CylinderType[]>([]);
-  const [brands, setBrands] = useState<Brand[]>([]);
   const [zoneId, setZoneId] = useState('');
   const [cylinderId, setCylinderId] = useState('');
-  const [brandId, setBrandId] = useState('');
   const [query, setQuery] = useState('');
   const [offers, setOffers] = useState<Offer[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
-      api<Zone[]>('/catalog/zones'), api<CylinderType[]>('/catalog/cylinder-types'), api<Brand[]>('/catalog/brands'),
-    ]).then(([z, c, b]) => {
-      setZones(z); setCylinders(c); setBrands(b);
+      api<Zone[]>('/catalog/zones'), api<CylinderType[]>('/catalog/cylinder-types'),
+    ]).then(([z, c]) => {
+      setZones(z); setCylinders(c);
       try {
         const saved = localStorage.getItem(ZONE_KEY);
         if (saved && z.some((x) => x.id === saved)) setZoneId(saved);
@@ -44,12 +42,11 @@ export default function Home() {
     const q = new URLSearchParams();
     if (zoneId) q.set('zoneId', zoneId);
     if (cylinderId) q.set('cylinderTypeId', cylinderId);
-    if (brandId) q.set('brandId', brandId);
     let live = true;
     setOffers(null);
     api<Offer[]>(`/products?${q}`).then((o) => live && setOffers(o)).catch((e) => live && setError(errorText(e)));
     return () => { live = false; };
-  }, [zoneId, cylinderId, brandId]);
+  }, [zoneId, cylinderId]);
 
   function pickZone(id: string) {
     setZoneId(id);
@@ -114,24 +111,6 @@ export default function Home() {
           </button>
         ))}
       </div>
-
-      {brands.length > 0 && (
-        <section className="stack-sm" aria-labelledby="marques">
-          <SectionHead id="marques" title="Nos marques" />
-          <div className="hscroll" role="group" aria-labelledby="marques">
-            {brands.map((b) => {
-              const logo = brandLogo(b.name);
-              return (
-                <button key={b.id} className="brand-tile" style={{ width: 92 }} aria-pressed={brandId === b.id}
-                  onClick={() => setBrandId(brandId === b.id ? '' : b.id)}>
-                  {logo ? <img src={logo} alt="" /> : <span className="brand-mark" style={{ background: brandColor(b.name) }}>{initials(b.name)}</span>}
-                  {b.name}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
 
       {error && <Notice kind="error">{error}</Notice>}
 

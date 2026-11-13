@@ -17,7 +17,7 @@ export function StoreCover({ summary, children, className = '' }: { summary: Sto
     <div className={`store-cover ${className}`}>
       {photo
         ? <img className="photo" src={photo} alt="" />
-        : bottles.map((o) => <Cylinder key={o.id} kg={o.cylinderType.capacityKg} color={brandColor(o.brand.name)} scale={0.62} />)}
+        : bottles.map((o) => <Cylinder key={o.id} brand={o.brand.name} kg={o.cylinderType.capacityKg} color={brandColor(o.brand.name)} scale={0.62} />)}
       {children}
     </div>
   );
