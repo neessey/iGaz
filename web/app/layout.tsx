@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description: 'Trouvez une bouteille de gaz disponible près de chez vous, achetez ou échangez, faites-vous livrer ou retirez au dépôt.',
 };
 
-export const viewport: Viewport = { themeColor: '#10201c', width: 'device-width', initialScale: 1 };
+export const viewport: Viewport = { themeColor: '#10201c', width: 'device-width', initialScale: 1, viewportFit: 'cover' };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
