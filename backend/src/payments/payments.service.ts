@@ -4,6 +4,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Payment, Prisma, User } from '@prisma/client';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { PaymentWebhookDto } from './payments.dto';
 
@@ -12,7 +13,11 @@ type Target = { orderId: string } | { checkoutId: string };
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService, private readonly config: ConfigService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   /**
    * Démarre (ou retrouve) le paiement mobile money d'une commande directe.
@@ -106,7 +111,8 @@ export class PaymentsService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const submitted: string[] = [];
+      const result = await this.prisma.$transaction(async (tx) => {
         // Transition PENDING → SUCCEEDED atomique : un rejeu du webhook ne fait rien.
         const res = await tx.payment.updateMany({
           where: { id: payment.id, status: 'PENDING' },
@@ -115,7 +121,7 @@ export class PaymentsService {
         if (res.count === 0) return { ok: true, duplicate: true };
 
         if (payment.orderId) {
-          await this.submitPaid(tx, payment.orderId, 'Paiement confirmé');
+          if (await this.submitPaid(tx, payment.orderId, 'Paiement confirmé')) submitted.push(payment.orderId);
         } else {
           // Panier : toutes les commandes payées par ce paiement partent ensemble à leurs dépôts.
           const orders = await tx.order.findMany({ where: { checkoutId: payment.checkoutId! }, include: { events: true } });
@@ -123,11 +129,14 @@ export class PaymentsService {
             // Une commande annulée avant le lancement du paiement n'a pas été facturée : rien à rembourser.
             const cancelledBefore = o.status === 'CANCELLED' &&
               o.events.some((e) => e.status === 'CANCELLED' && e.createdAt < payment.createdAt);
-            if (!cancelledBefore) await this.submitPaid(tx, o.id, 'Paiement du panier confirmé');
+            if (!cancelledBefore && await this.submitPaid(tx, o.id, 'Paiement du panier confirmé')) submitted.push(o.id);
           }
         }
         return { ok: true };
       });
+      // Après l'enregistrement : chaque dépôt est prévenu de la commande qui vient de lui être transmise.
+      for (const id of submitted) await this.notifications.orderEvent(id, 'SUBMITTED');
+      return result;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
         throw new ConflictException('Référence prestataire déjà utilisée');
@@ -136,16 +145,20 @@ export class PaymentsService {
     }
   }
 
-  /** Commande payée : transmise au dépôt ; si elle a été annulée entre-temps, on le signale pour remboursement. */
-  private async submitPaid(tx: Tx, orderId: string, note: string) {
+  /**
+   * Commande payée : transmise au dépôt (retourne true) ; si elle a été annulée entre-temps, on le signale pour
+   * remboursement (retourne false).
+   */
+  private async submitPaid(tx: Tx, orderId: string, note: string): Promise<boolean> {
     const moved = await tx.order.updateMany({ where: { id: orderId, status: 'PENDING_PAYMENT' }, data: { status: 'SUBMITTED' } });
     if (moved.count === 1) {
       await tx.orderEvent.create({ data: { orderId, status: 'SUBMITTED', note } });
-      return;
+      return true;
     }
     const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
     await tx.orderEvent.create({
       data: { orderId, status: order.status, note: 'Paiement reçu après annulation — remboursement à traiter' },
     });
+    return false;
   }
 }

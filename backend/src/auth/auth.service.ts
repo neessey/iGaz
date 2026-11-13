@@ -123,6 +123,8 @@ export class AuthService {
         await tx.store.updateMany({ where: { supplierId: supplier.id }, data: { isOpen: false } });
       }
       await tx.address.deleteMany({ where: { userId: user.id } });
+      await tx.notification.deleteMany({ where: { userId: user.id } });
+      await tx.pushSubscription.deleteMany({ where: { userId: user.id } });
       await tx.otpCode.deleteMany({ where: { phone: user.phone } });
       await tx.order.updateMany({ where: { clientId: user.id }, data: { deliveryDetails: null } });
       await tx.user.update({

@@ -10,12 +10,28 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { setupApp } from '../src/app.setup';
 import { SmsProvider } from '../src/auth/sms.provider';
+import { PushPayload, PushSender, PushTarget } from '../src/notifications/push.sender';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 class FakeSms extends SmsProvider {
   last = new Map<string, string>();
+  messages: { phone: string; message: string }[] = [];
   async send(phone: string, message: string) {
-    this.last.set(phone, /(\d{6})/.exec(message)![1]);
+    this.messages.push({ phone, message });
+    const code = /code de connexion est (\d{6})/.exec(message);
+    if (code) this.last.set(phone, code[1]);
+  }
+}
+
+/** Push factice : garde les envois ; l'abonnement « gone » est expiré côté service de push. */
+class FakePush extends PushSender {
+  readonly enabled = true;
+  readonly publicKey = 'cle-publique-de-test';
+  sent: { endpoint: string; payload: PushPayload }[] = [];
+  async send(target: PushTarget, payload: PushPayload) {
+    if (target.endpoint.endsWith('/gone')) return false;
+    this.sent.push({ endpoint: target.endpoint, payload });
+    return true;
   }
 }
 
@@ -23,6 +39,7 @@ describe('iGaz MVP — parcours complet', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   const sms = new FakeSms();
+  const push = new FakePush();
   const http = () => request(app.getHttpServer());
 
   const phones = {
@@ -45,7 +62,9 @@ describe('iGaz MVP — parcours complet', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(SmsProvider).useValue(sms).compile();
+      .overrideProvider(SmsProvider).useValue(sms)
+      .overrideProvider(PushSender).useValue(push)
+      .compile();
     app = setupApp(moduleRef.createNestApplication({ rawBody: true }));
     await app.init();
     prisma = app.get(PrismaService);
@@ -641,6 +660,84 @@ describe('iGaz MVP — parcours complet', () => {
   });
 
   // -------------------------------------------------- compte et adresses (Play Store)
+  describe('notifications', () => {
+    const keys = { p256dh: 'BPcleTestP256dh', auth: 'authTest' };
+    const mine = async (who: string) => (await http().get('/notifications').set(auth(who)).expect(200)).body;
+
+    it('nouvelle commande : le dépôt est prévenu dans l’application, en push et par SMS si activé ; pas l’autre dépôt', async () => {
+      await http().put(`/stores/${ids.storeA}/products/${ids.prodA}/stock`).set(auth('supA')).send({ quantity: 10 }).expect(200);
+      expect((await http().get('/notifications/push-key').expect(200)).body.publicKey).toBe('cle-publique-de-test');
+      await http().post('/notifications/push-subscriptions').set(auth('supA'))
+        .send({ endpoint: 'http://non-securise.test/x', keys }).expect(400);
+      await http().post('/notifications/push-subscriptions').set(auth('supA'))
+        .send({ endpoint: 'https://push.test/supA', keys }).expect(204);
+      await http().post('/notifications/push-subscriptions').expect(401);
+
+      process.env.NOTIFY_SUPPLIER_BY_SMS = 'true';
+      const res = await http().post('/orders').set(auth('client')).send({
+        storeId: ids.storeA, fulfillment: 'PICKUP', paymentMethod: 'CASH_ON_DELIVERY',
+        items: [{ productId: ids.prodA, kind: 'PURCHASE', quantity: 1 }],
+      }).expect(201);
+      delete process.env.NOTIFY_SUPPLIER_BY_SMS;
+      ids.notifOrder = res.body.id;
+
+      const a = await mine('supA');
+      expect(a.unread).toBeGreaterThan(0);
+      expect(a.items[0]).toMatchObject({ kind: 'ORDER_NEW', orderId: res.body.id, url: '/fournisseur#commandes', readAt: null });
+      expect(a.items[0].title).toBe(`Nouvelle commande #${res.body.code}`);
+      expect(a.items[0].body).toContain('retrait au dépôt');
+      expect(push.sent.some((s) => s.endpoint === 'https://push.test/supA' && s.payload.title.includes(res.body.code))).toBe(true);
+      expect(sms.messages.some((m) => m.message.includes(res.body.code))).toBe(true);
+      expect((await mine('supB')).items.some((n: any) => n.orderId === res.body.id)).toBe(false);
+      // Le code de remise du client n'apparaît dans aucune notification du dépôt
+      expect(a.items.every((n: any) => !`${n.title} ${n.body}`.includes(res.body.confirmationCode))).toBe(true);
+    });
+
+    it('chaque étape prévient le client ; marquer comme lu', async () => {
+      await http().post('/notifications/read-all').set(auth('client')).expect(204);
+      expect((await mine('client')).unread).toBe(0);
+      const id = ids.notifOrder;
+      await http().post(`/orders/${id}/accept`).set(auth('supA')).expect(200);
+      await http().post(`/orders/${id}/ready`).set(auth('supA')).expect(200);
+      const code = (await prisma.order.findUniqueOrThrow({ where: { id } })).confirmationCode;
+      await http().post(`/orders/${id}/complete`).set(auth('supA')).send({ code }).expect(200);
+
+      const c = await mine('client');
+      expect(c.unread).toBe(3);
+      expect(c.items.slice(0, 3).map((n: any) => n.kind)).toEqual(['ORDER_COMPLETED', 'ORDER_READY', 'ORDER_ACCEPTED']);
+      expect(c.items[0].url).toBe(`/commandes/${id}`);
+
+      // Un autre utilisateur ne peut pas marquer mes notifications comme lues
+      await http().post(`/notifications/${c.items[0].id}/read`).set(auth('client2')).expect(204);
+      expect((await mine('client')).unread).toBe(3);
+      await http().post(`/notifications/${c.items[0].id}/read`).set(auth('client')).expect(204);
+      expect((await mine('client')).unread).toBe(2);
+      await http().post('/notifications/read-all').set(auth('client')).expect(204);
+      expect((await mine('client')).unread).toBe(0);
+    });
+
+    it('mobile money : le dépôt n’est prévenu qu’à la confirmation du paiement ; abonnement push expiré supprimé', async () => {
+      await http().put(`/stores/${ids.storeB}/products/${ids.prodB}/stock`).set(auth('supB')).send({ quantity: 10 }).expect(200);
+      await http().post('/notifications/push-subscriptions').set(auth('supB')).send({ endpoint: 'https://push.test/gone', keys }).expect(204);
+      const addr = (await http().get('/addresses').set(auth('client2')).expect(200)).body[0];
+      const o = await http().post('/orders').set(auth('client2')).send({
+        storeId: ids.storeB, fulfillment: 'DELIVERY', paymentMethod: 'MOBILE_MONEY', addressId: addr.id,
+        items: [{ productId: ids.prodB, kind: 'PURCHASE', quantity: 1 }],
+      }).expect(201);
+      expect((await mine('supB')).items.some((n: any) => n.orderId === o.body.id)).toBe(false);
+
+      const p = await http().post(`/orders/${o.body.id}/payments`).set(auth('client2')).send({ idempotencyKey: 'notif-paiement-01' }).expect(200);
+      const raw = JSON.stringify({ reference: p.body.id, status: 'SUCCEEDED', amount: p.body.amount, providerRef: 'WAVE-NOTIF-1' });
+      const sig = createHmac('sha256', process.env.PAYMENT_WEBHOOK_SECRET!).update(raw).digest('hex');
+      await http().post('/payments/webhook').set('Content-Type', 'application/json').set('x-igaz-signature', sig).send(raw).expect(200);
+
+      const b = await mine('supB');
+      expect(b.items.find((n: any) => n.orderId === o.body.id)).toMatchObject({ kind: 'ORDER_NEW' });
+      expect(b.items.find((n: any) => n.orderId === o.body.id).body).toContain('déjà payé');
+      expect(await prisma.pushSubscription.count({ where: { endpoint: 'https://push.test/gone' } })).toBe(0);
+    });
+  });
+
   describe('prénom et nom', () => {
     it('inscription avec prénom et nom, mis en forme ; les deux sont requis ensemble', async () => {
       const phone = '0701000044';

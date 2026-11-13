@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { ConsoleSmsProvider, SmsProvider } from './sms.provider';
 
 @Module({
   imports: [
@@ -17,6 +16,6 @@ import { ConsoleSmsProvider, SmsProvider } from './sms.provider';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, { provide: SmsProvider, useClass: ConsoleSmsProvider }],
+  providers: [AuthService], // SmsProvider : fourni par SmsModule (global)
 })
 export class AuthModule {}

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/Icon';
+import { ReorderButton } from '@/components/ReorderButton';
 import { Guard } from '@/components/Shell';
 import { Loading, Notice, PageHead, StatusBadge } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
@@ -149,7 +150,9 @@ function OrderDetail() {
         <button className="btn btn-danger btn-block" disabled={busy} onClick={cancel}>Annuler la commande</button>
       ) : ACTIVE.includes(order.status) ? (
         <p className="small muted">Le dépôt a accepté la commande : pour l’annuler, appelez-le au {phoneFmt(order.store.phone)}.</p>
-      ) : null}
+      ) : (
+        <ReorderButton order={order} block />
+      )}
     </div>
   );
 }

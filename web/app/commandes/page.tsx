@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Cylinder } from '@/components/Cylinder';
+import { ReorderButton } from '@/components/ReorderButton';
 import { Guard } from '@/components/Shell';
 import { Empty, Loading, Notice, PageHead, StatusBadge } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
@@ -28,8 +29,10 @@ function Orders() {
         <div className="rows">
           {orders.map((o) => {
             const first = o.items[0];
+            const done = ['COMPLETED', 'REJECTED', 'CANCELLED'].includes(o.status);
             return (
-              <Link key={o.id} href={`/commandes/${o.id}`} className="card offer">
+              <div key={o.id} className="stack-sm">
+              <Link href={`/commandes/${o.id}`} className="card offer">
                 <span className="offer-media">
                   {first && <Cylinder kg={first.product.cylinderType.capacityKg} color={brandColor(first.product.brand.name)} scale={first.product.cylinderType.capacityKg >= 12 ? 0.65 : 0.8} />}
                 </span>
@@ -45,6 +48,8 @@ function Orders() {
                 </span>
                 <span className="offer-price"><span className="num big price">{fcfa(o.total)}</span></span>
               </Link>
+              {done && <ReorderButton order={o} />}
+              </div>
             );
           })}
         </div>

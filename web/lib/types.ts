@@ -21,7 +21,7 @@ export interface Order {
   subtotal: number; deliveryFee: number; total: number; confirmationCode?: string; createdAt: string;
   client?: { name: string | null; phone: string };
   store: { id: string; name: string; address: string; phone: string };
-  items: { id: string; kind: 'PURCHASE' | 'EXCHANGE'; quantity: number; unitPrice: number;
+  items: { id: string; productId: string; kind: 'PURCHASE' | 'EXCHANGE'; quantity: number; unitPrice: number;
     product: { brand: Brand; cylinderType: Cylinder } }[];
   events: { id: string; status: OrderStatus; note: string | null; createdAt: string }[];
   payments: { id: string; method: string; amount: number; status: string }[];

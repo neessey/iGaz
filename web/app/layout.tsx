@@ -4,6 +4,7 @@ import '@fontsource-variable/plus-jakarta-sans/wght.css';
 import './globals.css';
 import { Shell } from '@/components/Shell';
 import { CartProvider } from '@/lib/cart';
+import { NotificationsProvider } from '@/lib/notifications';
 import { SessionProvider } from '@/lib/session';
 
 export const metadata: Metadata = {
@@ -29,7 +30,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <SessionProvider>
           <CartProvider>
-            <Shell>{children}</Shell>
+            <NotificationsProvider>
+              <Shell>{children}</Shell>
+            </NotificationsProvider>
           </CartProvider>
         </SessionProvider>
       </body>

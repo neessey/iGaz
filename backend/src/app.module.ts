@@ -5,6 +5,8 @@ import { AdminOverviewModule } from './audit/admin-overview.controller';
 import { AuditModule } from './audit/audit.service';
 import { AddressesModule } from './addresses/addresses.controller';
 import { AuthModule } from './auth/auth.module';
+import { SmsModule } from './auth/sms.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { AuthGuard } from './common/auth.guard';
 import { OrdersModule } from './orders/orders.module';
@@ -16,7 +18,7 @@ import { SuppliersModule } from './suppliers/suppliers.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    PrismaModule, AuditModule, AdminOverviewModule, AuthModule, CatalogModule,
+    PrismaModule, AuditModule, SmsModule, NotificationsModule, AdminOverviewModule, AuthModule, CatalogModule,
     AddressesModule, SuppliersModule, ProductsModule, OrdersModule, PaymentsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: AuthGuard }],

@@ -365,6 +365,19 @@ input[type='checkbox'], input[type='radio'] { accent-color: var(--btn-bottom); }
   position: relative; width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; color: #fff; background: rgba(255, 255, 255, 0.16);
 }
+.notif {
+  display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: start; width: 100%; text-align: left;
+  border: 0; background: none; cursor: pointer; color: inherit; padding: 14px 0; border-bottom: 1px solid var(--line);
+}
+.rows-flat > .notif:last-child { border-bottom: 0; }
+.notif.unread strong { color: var(--ink); }
+.notif:not(.unread) { opacity: 0.75; }
+.notif-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--btn-bottom); margin-top: 6px; }
+.bell-btn {
+  position: relative; width: 44px; height: 44px; border-radius: 50%; flex: none; display: inline-flex; align-items: center;
+  justify-content: center; background: var(--surface); color: var(--ink); box-shadow: var(--shadow);
+}
+.bell-btn .tab-badge { top: -2px; right: -4px; }
 .round-btn .tab-badge { top: -2px; right: -4px; box-shadow: 0 0 0 2px var(--night-2); }
 .stack-lg > .vendor-sheet { margin: -44px -16px 0; }
 .vendor-sheet { position: relative; background: var(--bg); border-radius: 28px 28px 0 0; padding: 20px 16px 0; }

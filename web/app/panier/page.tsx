@@ -1,14 +1,18 @@
 'use client';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { Cylinder } from '@/components/Cylinder';
 import { Icon } from '@/components/Icon';
-import { Empty, Loading, PageHead } from '@/components/ui';
+import { Empty, Loading, Notice, PageHead } from '@/components/ui';
 import { MAX_STORES, useCart } from '@/lib/cart';
 import { fcfa } from '@/lib/format';
 import { brandColor } from '@/lib/media';
 
 export default function CartPage() {
   const cart = useCart();
+  // « Commander à nouveau » : bouteilles de l'ancienne commande qui ne sont plus disponibles.
+  const [missing, setMissing] = useState<string | null>(null);
+  useEffect(() => { setMissing(new URLSearchParams(window.location.search).get('indisponible')); }, []);
 
   if (!cart.ready) return <Loading />;
 
@@ -25,6 +29,7 @@ export default function CartPage() {
   return (
     <div className="stack-lg">
       <PageHead title="Mon panier" />
+      {missing && <Notice>Plus disponible pour le moment, non ajouté : {missing}.</Notice>}
 
       {cart.groups.map((g) => (
         <section key={g.storeId} className="card stack" aria-label={`Articles de ${g.storeName}`}>

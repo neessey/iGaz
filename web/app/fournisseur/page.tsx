@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import { Bell } from '@/components/Bell';
 import { Icon } from '@/components/Icon';
 import { Guard, HeroHeader } from '@/components/Shell';
 import { Sparkline } from '@/components/Sparkline';
@@ -166,7 +167,6 @@ function Dashboard() {
   const nothing = sections.every(([, list]) => list.length === 0);
   const recent = by('COMPLETED', 'REJECTED', 'CANCELLED').slice(0, 5);
   const month = monthStats(by('COMPLETED'));
-  const toAccept = by('SUBMITTED').length;
   const sales = by('COMPLETED').reduce((sum, o) => sum + o.total, 0);
   // Taux d'acceptation : commandes acceptées parmi celles sur lesquelles le dépôt s'est prononcé (pas encore d'avis clients).
   const accepted = by('ACCEPTED', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'COMPLETED').length;
@@ -184,11 +184,7 @@ function Dashboard() {
             <Icon name="back" size={20} />
           </button>
           <h1>Espace vendeur</h1>
-          <a className="round-btn" href="#commandes"
-            aria-label={toAccept ? `${toAccept} commande${toAccept > 1 ? 's' : ''} à accepter` : 'Aucune nouvelle commande'}>
-            <Icon name="bell" size={20} />
-            {toAccept > 0 && <span className="tab-badge" aria-hidden="true">{toAccept}</span>}
-          </a>
+          <Bell dark />
         </div>
       </div>
 

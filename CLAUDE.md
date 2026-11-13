@@ -78,7 +78,9 @@ fichier, l'interface affiche une illustration. Boutons d'au moins 44 px, pas d'a
   (`npm run store-assets`).
 - Bloquant, dépend du propriétaire : `web/lib/legal.ts` à compléter (société, contacts), relecture juridique des textes,
   hébergement HTTPS, prestataire SMS, agrégateur de paiement, accès des testeurs Google (connexion par SMS), compte Play.
-- Lots suivants convenus : 2 = avis et notes, statistiques vendeur, notifications, promotions ;
+- Fait aussi : notifications (dans l'application, push Web Push, SMS optionnel au dépôt ; textes dans
+  `backend/src/notifications/messages.ts`, jamais de code de remise) et « Commander à nouveau ».
+- Lots suivants convenus : 2 = avis et notes, statistiques vendeur, promotions ;
   3 = messagerie, espace livreur, abonnements, gestion admin des clients et remboursements.
 
 ## Reste à faire (ordre suggéré)
@@ -89,7 +91,7 @@ fichier, l'interface affiche une illustration. Boutons d'au moins 44 px, pas d'a
 2. **Prestataire SMS** : implémenter `SmsProvider` (`backend/src/auth/sms.provider.ts`).
 3. **Agrégateur de paiement** (Wave, Orange Money, MTN MoMo) : session de paiement dans `PaymentsService.initiate`,
    signature réelle dans `verifySignature`.
-4. **Notifications** fournisseur (nouvelle commande) et client (changements de statut).
+4. ~~Notifications~~ : fait (application, push, SMS optionnel). Reste : clés VAPID de production.
 5. **Stockage des documents fournisseurs** (aujourd'hui : URL seulement).
 6. **Limitation de débit**, CI GitHub Actions (tests unitaires + e2e avec PostgreSQL), remboursements manuels côté admin.
 7. Application mobile Flutter sur la même API — seulement après le pilote.

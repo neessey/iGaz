@@ -8,6 +8,9 @@ sans barre d'adresse, avec l'icône iGaz. Une mise à jour du site met donc à j
 - [ ] **Site en ligne en HTTPS** sur un nom de domaine (ex. `app.igaz.ci`), avec l'API (ex. `api.igaz.ci`) et la base PostgreSQL.
   Variables du web : `NEXT_PUBLIC_API_URL`. Variables de l'API : voir `backend/.env.example` (`CORS_ORIGIN` = adresse du site).
 - [ ] **Prestataire SMS** branché (`backend/src/auth/sms.provider.ts`) : sans lui, personne ne peut se connecter.
+- [ ] **Clés de notifications push** : générer une paire de production (`npx web-push generate-vapid-keys`) et la mettre
+  dans `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` de l'API (ne jamais réutiliser les clés de développement).
+  Décider si les dépôts reçoivent aussi un SMS par nouvelle commande (`NOTIFY_SUPPLIER_BY_SMS`, payant).
 - [ ] **Agrégateur de paiement** branché, ou le mobile money masqué au lancement (paiement à la remise seulement).
 - [ ] **`web/lib/legal.ts` complété** : raison sociale, RCCM, adresse, e-mail, téléphone ou WhatsApp du support.
   Les pages `/conditions` et `/confidentialite` relues par un juriste.

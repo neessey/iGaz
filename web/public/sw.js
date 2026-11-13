@@ -57,6 +57,31 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Notifications push (nouvelle commande pour un dépôt, étapes de commande pour un client).
+self.addEventListener('push', (event) => {
+  let data = { title: 'iGaz CI', body: '', url: '/' };
+  try { data = { ...data, ...event.data.json() }; } catch { /* message vide ou illisible : texte par défaut */ }
+  event.waitUntil(self.registration.showNotification(data.title, {
+    body: data.body,
+    icon: '/icons/icon-192.png',
+    badge: '/icons/favicon-32.png',
+    data: { url: data.url },
+    lang: 'fr',
+  }));
+});
+
+// Toucher la notification ouvre la page concernée (en réutilisant un onglet de l'application s'il existe).
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const win = wins.find((w) => w.url.startsWith(self.location.origin));
+    if (win) { await win.focus(); return win.navigate(url); }
+    return self.clients.openWindow(url);
+  })());
+});
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;

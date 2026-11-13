@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Cylinder } from '@/components/Cylinder';
 import { Icon } from '@/components/Icon';
-import { LogoMark } from '@/components/Logo';
+import { Bell } from '@/components/Bell';
 import { StoreCard } from '@/components/StoreCard';
 import { Empty, Loading, Notice, SectionHead } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
@@ -82,7 +82,7 @@ export default function Home() {
               </select>
             </label>
           </div>
-          {user ? <Link href="/" aria-label="iGaz CI, accueil"><LogoMark size={34} /></Link> : <Link className="btn btn-quiet btn-small" style={{ whiteSpace: 'nowrap', flex: 'none' }} href="/connexion">Se connecter</Link>}
+          {user ? <Bell /> :<Link className="btn btn-quiet btn-small" style={{ whiteSpace: 'nowrap', flex: 'none' }} href="/connexion">Se connecter</Link>}
         </div>
         <div className="search">
           <Icon name="search" size={20} />

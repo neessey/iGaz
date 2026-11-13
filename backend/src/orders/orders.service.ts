@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { OrderStatus, PaymentMethod, Prisma, User } from '@prisma/client';
 import { randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
 import { CreateCheckoutDto, CreateOrderDto } from './orders.dto';
@@ -37,6 +38,7 @@ export class OrdersService {
     private readonly suppliers: SuppliersService,
     private readonly audit: AuditService,
     private readonly config: ConfigService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -210,6 +212,8 @@ export class OrdersService {
     const address = await this.resolveAddress(user, dto.fulfillment === 'DELIVERY', dto.addressId);
     const prepared = await this.prepare(dto, dto.paymentMethod, address);
     const created = await this.prisma.$transaction((tx) => this.write(tx, user, prepared, dto.paymentMethod));
+    // Espèces : la commande part tout de suite au dépôt (en mobile money, au webhook de paiement).
+    if (created.status === 'SUBMITTED') await this.notifications.orderEvent(created.id, 'SUBMITTED');
     return this.present(await this.load(created.id), user);
   }
 
@@ -231,7 +235,7 @@ export class OrdersService {
       }
     }
 
-    const checkoutId = await this.prisma.$transaction(async (tx) => {
+    const { checkoutId, orders } = await this.prisma.$transaction(async (tx) => {
       const checkout = await tx.checkout.create({
         data: {
           code: `PN-${randomBytes(4).toString('hex').toUpperCase()}`,
@@ -239,9 +243,12 @@ export class OrdersService {
           total: prepared.reduce((sum, p) => sum + p.total, 0),
         },
       });
-      for (const p of prepared) await this.write(tx, user, p, dto.paymentMethod, checkout.id);
-      return checkout.id;
+      const written = [];
+      for (const p of prepared) written.push(await this.write(tx, user, p, dto.paymentMethod, checkout.id));
+      return { checkoutId: checkout.id, orders: written };
     });
+    // Chaque dépôt est prévenu de sa propre commande (en espèces ; en mobile money, au paiement).
+    for (const o of orders) if (o.status === 'SUBMITTED') await this.notifications.orderEvent(o.id, 'SUBMITTED');
     return this.getCheckout(user, checkoutId);
   }
 
@@ -310,12 +317,14 @@ export class OrdersService {
       }
       await this.move(tx, order, 'ACCEPTED', user.id);
     });
+    await this.notifications.orderEvent(id, 'ACCEPTED');
     return this.present(await this.load(id), user);
   }
 
   async reject(user: User, id: string, reason: string) {
     const order = await this.loadForOwner(user, id);
     await this.prisma.$transaction((tx) => this.move(tx, order, 'REJECTED', user.id, reason));
+    await this.notifications.orderEvent(id, 'REJECTED', { reason });
     return this.present(await this.load(id), user);
   }
 
@@ -323,6 +332,7 @@ export class OrdersService {
     const order = await this.loadForOwner(user, id);
     if (order.fulfillment !== 'PICKUP') throw new ConflictException('Cette commande est en livraison, pas en retrait');
     await this.prisma.$transaction((tx) => this.move(tx, order, 'READY_FOR_PICKUP', user.id));
+    await this.notifications.orderEvent(id, 'READY_FOR_PICKUP');
     return this.present(await this.load(id), user);
   }
 
@@ -330,6 +340,7 @@ export class OrdersService {
     const order = await this.loadForOwner(user, id);
     if (order.fulfillment !== 'DELIVERY') throw new ConflictException('Cette commande est en retrait, pas en livraison');
     await this.prisma.$transaction((tx) => this.move(tx, order, 'OUT_FOR_DELIVERY', user.id));
+    await this.notifications.orderEvent(id, 'OUT_FOR_DELIVERY');
     return this.present(await this.load(id), user);
   }
 
@@ -352,6 +363,7 @@ export class OrdersService {
         });
       }
     });
+    await this.notifications.orderEvent(id, 'COMPLETED');
     return this.present(await this.load(id), user);
   }
 
@@ -368,6 +380,7 @@ export class OrdersService {
     await this.prisma.$transaction((tx) =>
       this.move(tx, order, 'CANCELLED', user.id,
         paid ? 'Annulée par le client — remboursement à traiter par l’administration' : 'Annulée par le client'));
+    await this.notifications.orderEvent(id, 'CANCELLED_BY_CLIENT', { wasVisibleToStore: order.status === 'SUBMITTED' });
     return this.present(await this.load(id), user);
   }
 
@@ -391,6 +404,7 @@ export class OrdersService {
         before: { status: order.status }, after: { status: 'CANCELLED', reason },
       }, tx);
     });
+    await this.notifications.orderEvent(id, 'CANCELLED_BY_ADMIN', { reason, wasVisibleToStore: order.status !== 'PENDING_PAYMENT' });
     return this.get(admin, id);
   }
 }

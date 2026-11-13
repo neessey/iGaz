@@ -5,6 +5,7 @@ import { ReactNode, useEffect } from 'react';
 import { useCart } from '@/lib/cart';
 import { useSession } from '@/lib/session';
 import { Role } from '@/lib/types';
+import { Bell } from './Bell';
 import { CartBar } from './CartBar';
 import { Icon, IconName } from './Icon';
 import { Logo } from './Logo';
@@ -63,7 +64,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <header className="appbar">
           <div className="appbar-in">
             <Logo size={36} />
-            {!user && <Link className="pill-link" href="/connexion">Se connecter</Link>}
+            {user ? <Bell /> : <Link className="pill-link" href="/connexion">Se connecter</Link>}
           </div>
         </header>
       )}

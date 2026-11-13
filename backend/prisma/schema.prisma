@@ -76,6 +76,39 @@ model User {
   orders    Order[]
   checkouts Checkout[]
   auditLogs AuditLog[]
+  notifications     Notification[]
+  pushSubscriptions PushSubscription[]
+}
+
+/// Notification affichée dans l'application (cloche) et, si l'utilisateur l'a activé, envoyée sur son téléphone (push).
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  kind      String // ORDER_NEW, ORDER_ACCEPTED, ORDER_REJECTED, ORDER_READY, ORDER_OUT, ORDER_COMPLETED, ORDER_CANCELLED
+  title     String
+  body      String
+  url       String? // page de l'application à ouvrir
+  orderId   String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+/// Abonnement aux notifications push d'un navigateur ou de l'application installée (Web Push, clés VAPID).
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model OtpCode {
