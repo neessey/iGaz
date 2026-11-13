@@ -27,6 +27,9 @@ async function main() {
     await prisma.cylinderType.upsert({ where: { label: c.label }, update: {}, create: c });
   }
   await prisma.cylinderType.updateMany({ where: { label: { in: RETIRED } }, data: { isActive: false } });
+  // Rémunération d'iGaz pendant le pilote : 100 F de frais de service par commande, rien pris sur la livraison des
+  // dépôts. Créé une seule fois : l'admin les modifie ensuite depuis l'application (page Revenus).
+  await prisma.platformSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1, serviceFee: 100, deliveryShare: 0 } });
   const phone = normalizeIvorianPhone(process.env.ADMIN_PHONE ?? '');
   if (!phone) throw new Error('ADMIN_PHONE invalide ou manquant');
   await prisma.user.upsert({ where: { phone }, update: { role: 'ADMIN' }, create: { phone, name: 'Administrateur', role: 'ADMIN' } });

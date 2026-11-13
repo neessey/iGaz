@@ -45,7 +45,10 @@ function Checkout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart.ready, productIds]);
 
+  // Frais de service d'iGaz, ajoutés à chaque commande (une par dépôt) ; l'API refait le calcul à la création.
+  const [serviceFee, setServiceFee] = useState(0);
   useEffect(() => {
+    api<{ serviceFee: number }>('/catalog/fees').then((f) => setServiceFee(f.serviceFee)).catch(() => undefined);
     api<Zone[]>('/catalog/zones').then(setZones).catch(() => undefined);
     api<Address[]>('/addresses').then((a) => { setAddresses(a); if (a[0]) setAddressChoice(a[0].id); }).catch(() => undefined);
   }, []);
@@ -115,7 +118,9 @@ function Checkout() {
     || (needsAddress && addressChoice === 'new' && (!newZone || newDetails.trim().length < 3));
 
   const feeOf = (storeId: string) => (modes[storeId] === 'DELIVERY' ? storeOf(storeId)?.deliveryFee ?? 0 : 0);
-  const total = cart.groups.reduce((sum, g) => sum + g.subtotal + feeOf(g.storeId), 0);
+  const delivery = cart.groups.reduce((sum, g) => sum + feeOf(g.storeId), 0);
+  const services = serviceFee * cart.groups.length;
+  const total = cart.subtotal + delivery + services;
 
   async function submit() {
     setBusy(true); setError(null);
@@ -169,7 +174,7 @@ function Checkout() {
             </div>
             {modes[g.storeId] === 'PICKUP' && s && <p className="small muted">À retirer à {s.address}.</p>}
             {problems[g.storeId]?.map((p) => <Notice key={p} kind="error">{p}</Notice>)}
-            <div className="split small"><span className="muted">Sous-total{fee > 0 ? ' + livraison' : ''}</span><strong className="num">{fcfa(g.subtotal + fee)}</strong></div>
+            <div className="split small"><span className="muted">Sous-total{fee > 0 ? ' + livraison' : ''}{serviceFee > 0 ? ' + frais de service' : ''}</span><strong className="num">{fcfa(g.subtotal + fee + serviceFee)}</strong></div>
           </section>
         );
       })}
@@ -221,9 +226,11 @@ function Checkout() {
       <section className="card" aria-label="Total">
         <dl className="facts">
           <dt>Bouteilles</dt><dd className="num">{fcfa(cart.subtotal)}</dd>
-          <dt>Livraison</dt><dd className="num">{fcfa(total - cart.subtotal)}</dd>
+          <dt>Livraison</dt><dd className="num">{fcfa(delivery)}</dd>
+          {services > 0 && <><dt>Frais de service{cart.groups.length > 1 ? ` (${cart.groups.length} commandes)` : ''}</dt><dd className="num">{fcfa(services)}</dd></>}
           <dt className="total">Total</dt><dd className="total num price">{fcfa(total)}</dd>
         </dl>
+        {services > 0 && <p className="small muted" style={{ marginTop: 8 }}>Les frais de service ({fcfa(serviceFee)} par dépôt) permettent à iGaz de faire fonctionner le service.</p>}
       </section>
 
       {error && <Notice kind="error">{error}</Notice>}

@@ -22,9 +22,11 @@ const LINKS: Record<Role, { href: string; label: string; icon: IconName }[]> = {
     { href: '/fournisseur', label: 'Commandes reçues', icon: 'orders' },
     { href: '/fournisseur/stock', label: 'Mon stock', icon: 'box' },
     { href: '/fournisseur/boutique', label: 'Ma boutique', icon: 'store' },
+    { href: '/fournisseur/releves', label: 'Mes relevés', icon: 'wallet' },
   ],
   ADMIN: [
     { href: '/admin', label: 'Tableau de bord', icon: 'grid' },
+    { href: '/admin/revenus', label: 'Revenus et relevés', icon: 'wallet' },
     { href: '/admin/audit', label: 'Journal d’audit', icon: 'journal' },
   ],
 };

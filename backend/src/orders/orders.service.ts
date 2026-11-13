@@ -8,6 +8,8 @@ import { randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService, Tx } from '../prisma/prisma.service';
+import { FeeSettings, orderFees } from '../revenue/fees';
+import { RevenueService } from '../revenue/revenue.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
 import { CreateCheckoutDto, CreateOrderDto } from './orders.dto';
 import { canTransition, checkoutShapeError, isExchangeCompatible, isStoreOpenNow, orderTotals, STOCK_HELD } from './order-rules';
@@ -39,6 +41,7 @@ export class OrdersService {
     private readonly audit: AuditService,
     private readonly config: ConfigService,
     private readonly notifications: NotificationsService,
+    private readonly revenue: RevenueService,
   ) {}
 
   /**
@@ -47,7 +50,8 @@ export class OrdersService {
    */
   private present(order: FullOrder, viewer: User) {
     const view = { ...order, paidOnline: paidOnline(order) };
-    if (order.clientId === viewer.id) return view;
+    // La part d'iGaz sur la livraison se règle entre le dépôt et iGaz : le client n'en a pas l'usage.
+    if (order.clientId === viewer.id) { const { platformShare: _share, ...forClient } = view; return forClient; }
     const { confirmationCode: _hidden, checkout, ...rest } = view;
     return viewer.role === 'ADMIN' ? { ...rest, checkout } : rest;
   }
@@ -108,6 +112,7 @@ export class OrdersService {
   private async prepare(
     dto: Pick<CreateOrderDto, 'storeId' | 'fulfillment' | 'items'>, paymentMethod: PaymentMethod,
     address: { zoneId: string; details: string; zone: { name: string } } | null,
+    fees: FeeSettings,
   ) {
     const store = await this.prisma.store.findUnique({
       where: { id: dto.storeId },
@@ -170,7 +175,9 @@ export class OrdersService {
       };
     });
 
-    const { subtotal, deliveryFee, total } = orderTotals(itemsData, dto.fulfillment, store.deliveryFee);
+    // Frais d'iGaz figés sur la commande : un changement de réglage n'affecte jamais une commande passée.
+    const { serviceFee, platformShare } = orderFees(fees, dto.fulfillment, dto.fulfillment === 'DELIVERY' ? store.deliveryFee : 0);
+    const { subtotal, deliveryFee, total } = orderTotals(itemsData, dto.fulfillment, store.deliveryFee, serviceFee);
 
     if (paymentMethod === 'CASH_ON_DELIVERY') {
       const cap = Number(this.config.get('COD_MAX_AMOUNT') ?? 100000);
@@ -179,7 +186,7 @@ export class OrdersService {
       }
     }
 
-    return { store, fulfillment: dto.fulfillment, zoneId, deliveryDetails, subtotal, deliveryFee, total, itemsData };
+    return { store, fulfillment: dto.fulfillment, zoneId, deliveryDetails, subtotal, deliveryFee, serviceFee, platformShare, total, itemsData };
   }
 
   /** Écrit une commande préparée (dans la transaction donnée), avec son paiement en espèces le cas échéant. */
@@ -187,13 +194,13 @@ export class OrdersService {
     tx: Tx, user: User, prepared: Awaited<ReturnType<OrdersService['prepare']>>, paymentMethod: PaymentMethod, checkoutId?: string,
   ) {
     const status: OrderStatus = paymentMethod === 'MOBILE_MONEY' ? 'PENDING_PAYMENT' : 'SUBMITTED';
-    const { store, fulfillment, zoneId, deliveryDetails, subtotal, deliveryFee, total, itemsData } = prepared;
+    const { store, fulfillment, zoneId, deliveryDetails, subtotal, deliveryFee, serviceFee, platformShare, total, itemsData } = prepared;
     const order = await tx.order.create({
       data: {
         code: `GZ-${randomBytes(4).toString('hex').toUpperCase()}`,
         clientId: user.id, storeId: store.id, checkoutId,
         fulfillment, paymentMethod, status,
-        zoneId, deliveryDetails, subtotal, deliveryFee, total,
+        zoneId, deliveryDetails, subtotal, deliveryFee, serviceFee, platformShare, total,
         confirmationCode: String(randomInt(0, 1_000_000)).padStart(6, '0'),
         items: { create: itemsData },
         events: { create: { status, actorId: user.id } },
@@ -210,7 +217,7 @@ export class OrdersService {
 
   async create(user: User, dto: CreateOrderDto) {
     const address = await this.resolveAddress(user, dto.fulfillment === 'DELIVERY', dto.addressId);
-    const prepared = await this.prepare(dto, dto.paymentMethod, address);
+    const prepared = await this.prepare(dto, dto.paymentMethod, address, await this.revenue.settings());
     const created = await this.prisma.$transaction((tx) => this.write(tx, user, prepared, dto.paymentMethod));
     // Espèces : la commande part tout de suite au dépôt (en mobile money, au webhook de paiement).
     if (created.status === 'SUBMITTED') await this.notifications.orderEvent(created.id, 'SUBMITTED');
@@ -227,9 +234,10 @@ export class OrdersService {
     const address = await this.resolveAddress(user, dto.stores.some((s) => s.fulfillment === 'DELIVERY'), dto.addressId);
 
     const prepared: Awaited<ReturnType<OrdersService['prepare']>>[] = [];
+    const fees = await this.revenue.settings(); // mêmes réglages pour toutes les commandes du panier
     for (const s of dto.stores) {
       try {
-        prepared.push(await this.prepare(s, dto.paymentMethod, address));
+        prepared.push(await this.prepare(s, dto.paymentMethod, address, fees));
       } catch (e) {
         throw await this.namedStoreError(e, s.storeId);
       }

@@ -786,6 +786,85 @@ describe('iGaz MVP — parcours complet', () => {
     });
   });
 
+  describe('rémunération iGaz', () => {
+    it('réglages : admin seulement, bornés, audités ; frais publics pour le client', async () => {
+      await login('admin');
+      await http().patch('/admin/revenue/settings').set(auth('supA')).send({ serviceFee: 100 }).expect(403);
+      await http().patch('/admin/revenue/settings').set(auth('admin')).send({ serviceFee: 99999 }).expect(400);
+      await http().patch('/admin/revenue/settings').set(auth('admin')).send({ serviceFee: 2.5 }).expect(400);
+      const res = await http().patch('/admin/revenue/settings').set(auth('admin')).send({ serviceFee: 100, deliveryShare: 150 }).expect(200);
+      expect(res.body).toEqual({ serviceFee: 100, deliveryShare: 150 });
+      expect(await prisma.auditLog.count({ where: { action: 'FEES_UPDATE' } })).toBeGreaterThan(0);
+      expect((await http().get('/catalog/fees').expect(200)).body).toEqual({ serviceFee: 100 });
+    });
+
+    it('frais figés sur la commande, relevé du dépôt, commandes non terminées exclues, règlement d’un mois terminé', async () => {
+      await login('client');
+      await http().put(`/stores/${ids.storeA}/products/${ids.prodA}/stock`).set(auth('supA')).send({ quantity: 10 }).expect(200);
+      const before = (await http().get(`/stores/${ids.storeA}/statement`).set(auth('supA')).expect(200)).body;
+      await http().get(`/stores/${ids.storeA}/statement`).set(auth('supB')).expect(404); // cloisonnement
+      await http().get('/admin/revenue').set(auth('supA')).expect(403);
+
+      const body = {
+        storeId: ids.storeA, fulfillment: 'DELIVERY', paymentMethod: 'CASH_ON_DELIVERY', addressId: ids.addr,
+        items: [{ productId: ids.prodA, kind: 'PURCHASE', quantity: 1 }],
+      };
+      const order = (await http().post('/orders').set(auth('client')).send(body).expect(201)).body;
+      expect(order.serviceFee).toBe(100);
+      expect(order.total).toBe(order.subtotal + 500 + 100); // livraison du dépôt A : 500 F
+      expect(order.platformShare).toBeUndefined(); // affaire entre le dépôt et iGaz
+      const forDepot = (await http().get(`/orders/${order.id}`).set(auth('supA')).expect(200)).body;
+      expect(forDepot.platformShare).toBe(150);
+      expect(forDepot.payments[0].amount).toBe(order.total); // le dépôt encaisse tout, frais compris
+
+      // Une commande annulée ne coûte rien à personne
+      const cancelled = (await http().post('/orders').set(auth('client')).send(body).expect(201)).body;
+      await http().post(`/orders/${cancelled.id}/cancel`).set(auth('client')).expect(200);
+
+      // Nouveau réglage : sans effet sur la commande déjà passée
+      await http().patch('/admin/revenue/settings').set(auth('admin')).send({ serviceFee: 300 }).expect(200);
+      expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).serviceFee).toBe(100);
+
+      // En cours : hors relevé ; terminée (code client) : dans le relevé
+      await http().post(`/orders/${order.id}/accept`).set(auth('supA')).expect(200);
+      let now = (await http().get(`/stores/${ids.storeA}/statement`).set(auth('supA')).expect(200)).body;
+      expect(now.orders).toBe(before.orders);
+      await http().post(`/orders/${order.id}/dispatch`).set(auth('supA')).expect(200);
+      await http().post(`/orders/${order.id}/complete`).set(auth('supA')).send({ code: order.confirmationCode }).expect(200);
+      now = (await http().get(`/stores/${ids.storeA}/statement`).set(auth('supA')).expect(200)).body;
+      expect(now.orders).toBe(before.orders + 1);
+      expect(now.serviceFees - before.serviceFees).toBe(100);
+      expect(now.deliveryShares - before.deliveryShares).toBe(150);
+      expect(now.balance - before.balance).toBe(250); // espèces : le dépôt doit 100 + 150 F à iGaz
+      expect(now.lines.find((l: any) => l.id === order.id)).toMatchObject({ depotOwes: 250, platformOwes: 0 });
+
+      // Mois en cours : pas encore réglable
+      const month = now.month as string;
+      await http().post(`/admin/revenue/stores/${ids.storeA}/${month}/settle`).set(auth('admin')).send({}).expect(422);
+
+      // Mois terminé (remise datée du mois dernier) : réglé une fois, pour le solde calculé, avec audit
+      const lastMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 1, 15));
+      await prisma.orderEvent.updateMany({ where: { orderId: order.id, status: 'COMPLETED' }, data: { createdAt: lastMonth } });
+      const past = lastMonth.toISOString().slice(0, 7);
+      const statementPast = (await http().get(`/admin/revenue/stores/${ids.storeA}?month=${past}`).set(auth('admin')).expect(200)).body;
+      expect(statementPast.orders).toBe(1);
+      const admin = (await http().get(`/admin/revenue?month=${past}`).set(auth('admin')).expect(200)).body;
+      expect(admin.revenue).toBe(250);
+      expect(admin.stores.map((s: any) => s.store.id)).toEqual([ids.storeA]);
+      await http().post(`/admin/revenue/stores/${ids.storeA}/${past}/settle`).set(auth('supA')).send({}).expect(403);
+      const settled = await http().post(`/admin/revenue/stores/${ids.storeA}/${past}/settle`).set(auth('admin')).send({ note: 'Wave 12/11' }).expect(201);
+      expect(settled.body.amount).toBe(250);
+      await http().post(`/admin/revenue/stores/${ids.storeA}/${past}/settle`).set(auth('admin')).send({}).expect(409);
+      await http().post(`/admin/revenue/stores/${ids.storeB}/${past}/settle`).set(auth('admin')).send({}).expect(422); // rien à régler
+      expect(await prisma.auditLog.count({ where: { action: 'SETTLEMENT', entityId: ids.storeA } })).toBe(1);
+      const seen = (await http().get(`/stores/${ids.storeA}/statement?month=${past}`).set(auth('supA')).expect(200)).body;
+      expect(seen.settlement.amount).toBe(250);
+
+      // Retour à « pas de frais » pour la suite des tests
+      await http().patch('/admin/revenue/settings').set(auth('admin')).send({ serviceFee: 0, deliveryShare: 0 }).expect(200);
+    });
+  });
+
   describe('prénom et nom', () => {
     it('inscription avec prénom et nom, mis en forme ; les deux sont requis ensemble', async () => {
       const phone = '0701000044';

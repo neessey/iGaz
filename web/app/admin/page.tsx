@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { Guard, HeroHeader } from '@/components/Shell';
@@ -71,6 +72,11 @@ function Overview() {
         </div>
       </HeroHeader>
       {error && <Notice kind="error">{error}</Notice>}
+
+      <Link className="card card-link split" href="/admin/revenus">
+        <span className="cluster" style={{ gap: 10, fontWeight: 800 }}><Icon name="wallet" size={22} />Revenus et relevés des dépôts</span>
+        <Icon name="chevron" size={20} />
+      </Link>
 
       <section className="stack-sm" aria-labelledby="activite">
         <SectionHead id="activite" title="Activité récente" more={{ href: '/admin/audit' }} />

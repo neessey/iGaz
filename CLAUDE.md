@@ -11,8 +11,14 @@ messages d'erreur, textes d'interface et documentation sont **en français**.
   messagerie, avis, litiges) ne doit **pas** être développé sans accord explicite.
   Le 13/11/2026, le propriétaire a donné son accord pour développer ceux que montre la maquette (messagerie, avis et notes,
   espace livreur, abonnements, promotions, panier multi-dépôts), **chacun après validation d'un plan** (base + API + interface).
-  Commissions et litiges restent reportés. Fait : panier multi-dépôts. Ordre proposé ensuite : avis et notes, promotions,
-  messagerie, espace livreur, abonnements.
+  Litiges restent reportés. Fait : panier multi-dépôts, et (plan validé le 13/11/2026) la rémunération d'iGaz ci-dessous.
+  Ordre proposé ensuite : avis et notes, promotions, messagerie, espace livreur, abonnements.
+- Rémunération d'iGaz (`backend/src/revenue/`, règles dans `fees.ts`) : frais de service par commande payés par le client
+  (100 F pendant le pilote, seed) et part sur les frais de livraison payée par le dépôt (0 F pendant le pilote), réglés
+  par l'admin (page `/admin/revenus`, audit `FEES_UPDATE`), **figés sur la commande** (`serviceFee`, `platformShare`).
+  Relevé mensuel par dépôt sur les commandes terminées (`/fournisseur/releves`) ; règlement manuel d'un mois terminé
+  enregistré par l'admin (`Settlement`, audit `SETTLEMENT`). Le client ne voit jamais `platformShare`. Pas de
+  reversement automatique tant que l'agrégateur de paiement n'est pas branché.
 
 ## Structure
 

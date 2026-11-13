@@ -138,6 +138,7 @@ function OrderDetail() {
             </div>
           ))}
           {order.fulfillment === 'DELIVERY' && (<><dt>Livraison</dt><dd className="num">{order.deliveryFee > 0 ? fcfa(order.deliveryFee) : 'Gratuite'}</dd></>)}
+          {(order.serviceFee ?? 0) > 0 && (<><dt>Frais de service</dt><dd className="num">{fcfa(order.serviceFee!)}</dd></>)}
           <dt className="total">Total</dt><dd className="total num price">{fcfa(order.total)}</dd>
         </dl>
         <p className="small muted">

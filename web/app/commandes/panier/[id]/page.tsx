@@ -95,7 +95,7 @@ function CheckoutView() {
                 <StatusBadge status={o.status} />
                 <span className="num price">{fcfa(o.total)}</span>
               </div>
-              <p className="small muted">{o.fulfillment === 'DELIVERY' ? 'Livraison' : 'Retrait au dépôt'}{o.deliveryFee > 0 ? `, dont ${fcfa(o.deliveryFee)} de livraison` : ''}</p>
+              <p className="small muted">{o.fulfillment === 'DELIVERY' ? 'Livraison' : 'Retrait au dépôt'}{o.deliveryFee > 0 ? `, dont ${fcfa(o.deliveryFee)} de livraison` : ''}{(o.serviceFee ?? 0) > 0 ? ` et ${fcfa(o.serviceFee!)} de frais de service` : ''}</p>
             </Link>
           ))}
         </div>

@@ -13,13 +13,14 @@ import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
+import { RevenueModule } from './revenue/revenue.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule, AuditModule, SmsModule, NotificationsModule, AdminOverviewModule, AuthModule, CatalogModule,
-    AddressesModule, SuppliersModule, ProductsModule, OrdersModule, PaymentsModule,
+    AddressesModule, SuppliersModule, ProductsModule, OrdersModule, PaymentsModule, RevenueModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: AuthGuard }],
 })

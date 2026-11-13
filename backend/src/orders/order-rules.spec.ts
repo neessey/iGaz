@@ -28,8 +28,11 @@ describe('order-rules', () => {
 
     it('totaux d’une commande : frais de livraison seulement en livraison, montants entiers', () => {
       const items = [{ unitPrice: 7500, quantity: 1 }, { unitPrice: 1500, quantity: 2 }];
-      expect(orderTotals(items, 'DELIVERY', 500)).toEqual({ subtotal: 10500, deliveryFee: 500, total: 11000 });
-      expect(orderTotals(items, 'PICKUP', 500)).toEqual({ subtotal: 10500, deliveryFee: 0, total: 10500 });
+      expect(orderTotals(items, 'DELIVERY', 500)).toEqual({ subtotal: 10500, deliveryFee: 500, serviceFee: 0, total: 11000 });
+      expect(orderTotals(items, 'PICKUP', 500)).toEqual({ subtotal: 10500, deliveryFee: 0, serviceFee: 0, total: 10500 });
+      // Frais de service d'iGaz : ajoutés au total, en livraison comme en retrait.
+      expect(orderTotals(items, 'DELIVERY', 500, 100)).toEqual({ subtotal: 10500, deliveryFee: 500, serviceFee: 100, total: 11100 });
+      expect(orderTotals(items, 'PICKUP', 500, 100).total).toBe(10600);
       // Chaque dépôt facture ses propres frais : deux commandes en livraison = deux frais.
       const twoStores = orderTotals(items, 'DELIVERY', 500).total + orderTotals([{ unitPrice: 7000, quantity: 1 }], 'DELIVERY', 700).total;
       expect(twoStores).toBe(11000 + 7700);

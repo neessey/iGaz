@@ -29,6 +29,8 @@ export const AUDIT_LABEL: Record<string, string> = {
   CREATE: 'Création', UPDATE: 'Modification', SUPPLIER_APPROVED: 'Fournisseur validé', SUPPLIER_REJECTED: 'Fournisseur refusé',
   SUPPLIER_SUSPENDED: 'Fournisseur suspendu', STOCK_CORRECTION: 'Correction de stock', ORDER_CANCEL: 'Commande annulée',
   ACCOUNT_DELETED: 'Compte supprimé par son titulaire',
+  FEES_UPDATE: 'Frais iGaz modifiés',
+  SETTLEMENT: 'Relevé d’un dépôt réglé',
 };
 
 export const dateTime = (iso: string) =>

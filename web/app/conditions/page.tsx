@@ -31,6 +31,7 @@ export default function Terms() {
         <h2>3. Commandes et prix</h2>
         <ul>
           <li>Les prix sont en francs CFA et fixés par chaque dépôt. Le prix affiché au moment de la commande est celui que vous payez.</li>
+          <li>iGaz CI ajoute à chaque commande des frais de service, affichés avant la validation et inclus dans le total. Une commande refusée ou annulée ne vous est pas facturée.</li>
           <li>Un panier peut regrouper jusqu’à 3 dépôts : vous recevez une commande par dépôt, chacune avec ses frais de livraison.</li>
           <li>Le dépôt peut refuser une commande (rupture, zone non desservie). Vous êtes alors prévenu et remboursé si vous aviez payé.</li>
         </ul>
@@ -57,7 +58,7 @@ export default function Terms() {
         <p>Vérifiez l’état de la bouteille et du joint à la remise. Refusez une bouteille abîmée ou qui sent le gaz. En cas de fuite ou d’incendie, appelez les sapeurs-pompiers (GSPM) au <strong>180</strong>.</p>
 
         <h2>9. Vendeurs</h2>
-        <p>Les dépôts s’engagent à tenir leur stock et leurs prix à jour, à respecter la réglementation sur le gaz et à ne clôturer une commande qu’avec le code du client.</p>
+        <p>Les dépôts s’engagent à tenir leur stock et leurs prix à jour, à respecter la réglementation sur le gaz et à ne clôturer une commande qu’avec le code du client. iGaz CI peut prélever une part, fixe et connue à l’avance, sur les frais de livraison des commandes livrées. Un relevé mensuel, consultable dans l’espace vendeur, fait le compte entre le dépôt et iGaz CI sur les commandes terminées.</p>
 
         <h2>10. Suppression du compte</h2>
         <p>Vous pouvez supprimer votre compte à tout moment : <Link href="/compte/supprimer">Supprimer mon compte</Link>.</p>

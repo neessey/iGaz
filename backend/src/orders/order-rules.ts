@@ -50,14 +50,15 @@ export function checkoutShapeError(stores: { storeId: string; items: unknown[] }
 
 /**
  * Totaux d'une commande (un dépôt) : prix unitaires figés × quantités, plus les frais de livraison du dépôt
- * seulement en livraison. Montants en FCFA entiers.
+ * seulement en livraison, plus les frais de service d'iGaz (voir revenue/fees.ts). Montants en FCFA entiers.
  */
 export function orderTotals(
   items: { unitPrice: number; quantity: number }[], fulfillment: 'DELIVERY' | 'PICKUP', storeDeliveryFee: number,
+  serviceFee = 0,
 ) {
   const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
   const deliveryFee = fulfillment === 'DELIVERY' ? storeDeliveryFee : 0;
-  return { subtotal, deliveryFee, total: subtotal + deliveryFee };
+  return { subtotal, deliveryFee, serviceFee, total: subtotal + deliveryFee + serviceFee };
 }
 
 function toMinutes(hhmm: string): number {

@@ -190,8 +190,9 @@ model Store {
 
   supplier Supplier           @relation(fields: [supplierId], references: [id])
   areas    StoreServiceArea[]
-  products Product[]
-  orders   Order[]
+  products    Product[]
+  orders      Order[]
+  settlements Settlement[]
 }
 
 model StoreServiceArea {
@@ -289,7 +290,9 @@ model Order {
   deliveryDetails  String? // copie de l'adresse au moment de la commande
   subtotal         Int
   deliveryFee      Int             @default(0)
-  total            Int
+  serviceFee       Int             @default(0) // frais de service iGaz payés par le client, figés à la création
+  platformShare    Int             @default(0) // part d'iGaz sur les frais de livraison (payée par le dépôt), figée
+  total            Int // subtotal + deliveryFee + serviceFee
   confirmationCode String // code à 6 chiffres communiqué au client uniquement
   checkoutId       String? // panier multi-dépôts dont fait partie la commande (null : commande directe)
   createdAt        DateTime        @default(now())
@@ -371,6 +374,31 @@ model Payment {
 
   @@index([orderId])
   @@index([checkoutId])
+}
+
+/// Réglages de rémunération d'iGaz (une seule ligne, id = 1), modifiés par l'admin (journal d'audit). Ils ne
+/// s'appliquent qu'aux nouvelles commandes : chaque commande garde les montants du jour de sa création.
+model PlatformSettings {
+  id            Int      @id @default(1)
+  serviceFee    Int      @default(0) // frais de service par commande, payés par le client
+  deliveryShare Int      @default(0) // part d'iGaz sur les frais de livraison d'une commande livrée (plafonnée à ceux-ci)
+  updatedAt     DateTime @updatedAt
+}
+
+/// Règlement du relevé mensuel d'un dépôt (commandes terminées du mois) : enregistré par l'admin une fois l'argent
+/// échangé (Wave, virement…). amount > 0 : le dépôt a payé iGaz ; < 0 : iGaz a payé le dépôt.
+model Settlement {
+  id           String   @id @default(uuid())
+  storeId      String
+  month        String // AAAA-MM
+  amount       Int
+  note         String?
+  recordedById String
+  createdAt    DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@unique([storeId, month])
 }
 
 model AuditLog {

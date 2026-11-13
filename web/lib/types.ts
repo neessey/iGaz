@@ -21,6 +21,10 @@ export interface Order {
   id: string; code: string; status: OrderStatus; fulfillment: 'DELIVERY' | 'PICKUP';
   paymentMethod: 'MOBILE_MONEY' | 'CASH_ON_DELIVERY'; deliveryDetails: string | null;
   subtotal: number; deliveryFee: number; total: number; confirmationCode?: string; createdAt: string;
+  /** Frais de service d'iGaz (inclus dans le total). */
+  serviceFee?: number;
+  /** Part d'iGaz sur la livraison (visible par le dépôt et l'admin seulement). */
+  platformShare?: number;
   client?: { name: string | null; phone: string };
   store: { id: string; name: string; address: string; phone: string };
   items: { id: string; productId: string; kind: 'PURCHASE' | 'EXCHANGE'; quantity: number; unitPrice: number;

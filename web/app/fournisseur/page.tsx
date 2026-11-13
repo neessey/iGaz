@@ -78,6 +78,13 @@ function OrderCard({ order, onChange }: { order: Order; onChange: () => void }) 
         <strong className="num price" style={{ fontSize: '1.15rem' }}>{fcfa(order.total)}</strong>
         {cash ? ' à encaisser à la remise' : ' déjà payé en mobile money'}. <span className="muted">{dateTime(order.createdAt)}</span>
       </p>
+      {((order.serviceFee ?? 0) + (order.platformShare ?? 0)) > 0 && (
+        <p className="small muted">
+          Part iGaz : {fcfa((order.serviceFee ?? 0) + (order.platformShare ?? 0))}
+          {(order.serviceFee ?? 0) > 0 && <> (frais de service {fcfa(order.serviceFee!)} payés par le client{(order.platformShare ?? 0) > 0 ? `, part livraison ${fcfa(order.platformShare!)}` : ''})</>}
+          {cash ? ', à reverser avec votre relevé du mois.' : ', déduite de votre reversement.'}
+        </p>
+      )}
 
       {error && <Notice kind="error">{error}</Notice>}
 
