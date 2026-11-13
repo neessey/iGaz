@@ -70,6 +70,11 @@ fichier, l'interface affiche une illustration. Boutons d'au moins 44 px, pas d'a
 - Cloisonnement : un fournisseur ne voit jamais les boutiques, commandes ou finances d'un autre (réponse 404, pas 403).
 - Toute règle métier nouvelle ou modifiée s'accompagne d'un test (unitaire dans `order-rules.spec.ts` ou e2e dans `test/`).
 
+## Démo en ligne (voir `docs/vercel.md`)
+
+Démo privée sur Vercel : `igaz-web` (protégé sur toutes les adresses) et `igaz-api` + base Neon. Connexion par clé de
+démo (`DEMO_ACCESS_KEY`) tant qu'il n'y a pas de prestataire SMS : ne jamais rendre le site public avec cette clé.
+
 ## Publication Play Store (voir `docs/android.md`)
 
 - Fait (lot 1) : 13 communes du district, gestion des adresses, suppression de compte (`DELETE /auth/me`, anonymisation,
