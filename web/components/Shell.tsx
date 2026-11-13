@@ -1,8 +1,9 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useCart } from '@/lib/cart';
+import { isStandalone, prefersWeb } from '@/lib/install';
 import { useSession } from '@/lib/session';
 import { Role } from '@/lib/types';
 import { Bell } from './Bell';
@@ -40,10 +41,10 @@ const TABS: Record<Role, Tab[]> = {
 };
 
 /** Pages plein écran, sans en-tête ni barre d'onglets. */
-const BARE = ['/connexion'];
+const BARE = ['/connexion', '/presentation'];
 
 /** Pages ouvertes sans compte ni écran de connexion (liens publics exigés par le Play Store, page hors ligne). */
-const PUBLIC = ['/connexion', '/conditions', '/confidentialite', '/aide', '/compte/supprimer', '/hors-ligne'];
+const PUBLIC = ['/connexion', '/presentation', '/conditions', '/confidentialite', '/aide', '/compte/supprimer', '/hors-ligne'];
 
 export function Shell({ children }: { children: ReactNode }) {
   const { user, ready, guest } = useSession();
@@ -56,19 +57,31 @@ export function Shell({ children }: { children: ReactNode }) {
     (t) => pathname === t.href || (t.href !== '/' && pathname.startsWith(t.href)),
   );
 
+  // Application installée (écran d'accueil, plus tard les stores) ou simple onglet de navigateur : connu après
+  // le premier rendu (null avant), l'écran de lancement couvre ce moment.
+  const [app, setApp] = useState<boolean | null>(null);
+  useEffect(() => setApp(isStandalone()), []);
+
+  // Dans un navigateur, le site s'ouvre sur la présentation (avec « Installer l'application »), sauf pour un visiteur
+  // connecté ou qui a déjà choisi d'utiliser le site (« Utiliser dans le navigateur », « Continuer sans compte »).
+  const landing = ready && app === false && pathname === '/' && !user && !guest && !prefersWeb();
+  useEffect(() => { if (landing) router.replace('/presentation'); }, [landing, router]);
+
   // Sans compte (première ouverture, ou après une déconnexion), l'application s'ouvre sur l'écran de connexion,
   // sauf si le visiteur a choisi « Continuer sans compte ».
   const open = PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-  const mustLogin = ready && !user && !guest && !open;
+  const mustLogin = ready && app !== null && !user && !guest && !open && !landing;
+  // L'écran de lancement ne dure un instant de plus que dans l'application installée, pas sur le site.
+  const waiting = launching && app !== false;
   useEffect(() => {
-    if (mustLogin && !launching) {
+    if (mustLogin && !waiting) {
       // Après la connexion, retour à la page demandée (lien de notification, par exemple), sauf accueil et profil.
       const back = pathname !== '/' && pathname !== '/profil';
       router.replace(back ? `/connexion?next=${encodeURIComponent(pathname)}` : '/connexion');
     }
-  }, [mustLogin, launching, pathname, router]);
+  }, [mustLogin, waiting, pathname, router]);
 
-  if (!open && (!ready || launching || mustLogin)) return <><Splash /><ServiceWorker /></>;
+  if (!open && (!ready || app === null || waiting || mustLogin || landing)) return <><Splash /><ServiceWorker /></>;
 
   if (BARE.includes(pathname)) return <>{children}<ServiceWorker /></>;
 

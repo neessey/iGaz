@@ -21,6 +21,9 @@ messages d'erreur, textes d'interface et documentation sont **en français**.
   `/depot/[id]`, `/panier`, `/commandes`, `/profil`), fournisseur (`/fournisseur/*`), administration (`/admin/*`).
   Parcours client façon appli de livraison : on choisit un dépôt, on ajoute avec « + », barre panier flottante
   (s'inspirer des usages de ces applis, sans reprendre la marque ni le visuel d'une autre). Design : voir « Design » ci-dessous.
+  Site ou application : ouvert dans un navigateur, `/` mène au site de présentation `/presentation` (bouton « Installer
+  l'application », `lib/install.ts`), sauf visiteur connecté ou ayant choisi le navigateur ; l'application installée
+  (affichage standalone : écran d'accueil, plus tard Play Store) ouvre directement l'application (`Shell.tsx`).
 
 ## Commandes du web (depuis `web/`)
 
