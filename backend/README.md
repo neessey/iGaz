@@ -12,10 +12,13 @@ cp .env.example .env                 # puis renseigner JWT_SECRET, PAYMENT_WEBHO
 npm install
 npx prisma migrate deploy            # applique prisma/migrations
 npm run seed                         # communes d'Abidjan, formats B3/B6/B12, compte admin
+npm run seed:demo                    # (facultatif, local) 2 dépôts et 2 marques fictifs pour essayer l'interface
 npm run start:dev                    # http://localhost:3000
 ```
 
-En développement, le code OTP est affiché dans les logs du serveur (aucun SMS n'est envoyé).
+En développement, le code OTP est affiché dans les logs du serveur (aucun SMS n'est envoyé). Avec `EXPOSE_DEV_OTP=true`,
+l'API le renvoie aussi dans sa réponse (`devCode`) pour les démonstrations locales ; ignoré en production.
+`CORS_ORIGIN` liste les origines autorisées pour l'interface web (obligatoire en production).
 En production, l'envoi échoue tant qu'aucun prestataire SMS n'est branché (`src/auth/sms.provider.ts`).
 
 ## Tests

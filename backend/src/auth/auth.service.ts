@@ -49,7 +49,9 @@ export class AuthService {
       },
     });
     await this.sms.send(phone, `iGaz : votre code de connexion est ${code}. Il expire dans ${Math.round(ttl / 60)} min.`);
-    return { sent: true };
+    // Démonstration locale uniquement : jamais en production, et seulement si EXPOSE_DEV_OTP=true.
+    const expose = this.config.get('EXPOSE_DEV_OTP') === 'true' && process.env.NODE_ENV !== 'production';
+    return expose ? { sent: true, devCode: code } : { sent: true };
   }
 
   async verifyOtp(rawPhone: string, code: string, name?: string) {

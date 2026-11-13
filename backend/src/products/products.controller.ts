@@ -15,6 +15,11 @@ export class ProductsController {
     return this.products.search(q);
   }
 
+  @Public() @Get('products/:id')
+  detail(@Param('id', ParseUUIDPipe) id: string) {
+    return this.products.detail(id);
+  }
+
   @Roles(Role.SUPPLIER) @Get('stores/:storeId/products')
   list(@CurrentUser() user: User, @Param('storeId', ParseUUIDPipe) storeId: string) {
     return this.products.listForStore(user, storeId);

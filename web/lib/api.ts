@@ -1,0 +1,53 @@
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+const TOKEN_KEY = 'igaz.token';
+
+export class ApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
+export function getToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* stockage indisponible (navigation privée) : la session ne survivra pas au rechargement */
+  }
+}
+
+/** Appel JSON vers l'API. Les erreurs de validation de l'API sont déjà rédigées en français. */
+export async function api<T = unknown>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+  const token = getToken();
+  let res: Response;
+  try {
+    res = await fetch(`${API}${path}`, {
+      method: init.method ?? (init.body ? 'POST' : 'GET'),
+      headers: {
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: init.body ? JSON.stringify(init.body) : undefined,
+    });
+  } catch {
+    throw new ApiError(0, "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.");
+  }
+  if (res.status === 204) return undefined as T;
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const raw = data?.message;
+    const message = Array.isArray(raw) ? raw.join(' ') : raw ?? 'Une erreur est survenue';
+    throw new ApiError(res.status, message);
+  }
+  return data as T;
+}
+
+export const errorText = (e: unknown) => (e instanceof Error ? e.message : 'Une erreur est survenue');

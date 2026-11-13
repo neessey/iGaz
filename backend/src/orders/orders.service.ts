@@ -15,6 +15,8 @@ const ORDER_INCLUDE = {
   items: { include: { product: { include: { brand: true, cylinderType: true } } } },
   events: { orderBy: { createdAt: 'asc' } },
   store: { select: { id: true, name: true, address: true, phone: true } },
+  // Coordonnées du client : nécessaires au dépôt pour joindre le client à la livraison.
+  client: { select: { name: true, phone: true } },
   payments: { select: { id: true, method: true, amount: true, status: true, createdAt: true } },
 } satisfies Prisma.OrderInclude;
 

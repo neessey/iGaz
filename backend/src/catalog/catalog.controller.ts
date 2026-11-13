@@ -30,6 +30,21 @@ export class CatalogController {
   }
 
   // ---- Administration ----
+  @Roles(Role.ADMIN) @Get('admin/brands')
+  allBrands() {
+    return this.prisma.gasBrand.findMany({ orderBy: { name: 'asc' } });
+  }
+
+  @Roles(Role.ADMIN) @Get('admin/cylinder-types')
+  allCylinderTypes() {
+    return this.prisma.cylinderType.findMany({ orderBy: { capacityKg: 'asc' } });
+  }
+
+  @Roles(Role.ADMIN) @Get('admin/zones')
+  allZones() {
+    return this.prisma.serviceZone.findMany({ orderBy: { name: 'asc' } });
+  }
+
   private async create<T extends { id: string }>(
     admin: User, entity: string, run: () => Promise<T>, duplicateMessage: string,
   ): Promise<T> {

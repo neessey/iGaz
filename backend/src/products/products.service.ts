@@ -110,6 +110,28 @@ export class ProductsService {
     });
   }
 
+  /** Fiche produit publique : mêmes conditions de visibilité que la recherche (fournisseur validé, produit actif). */
+  async detail(id: string) {
+    const product = await this.prisma.product.findFirst({
+      where: { id, isActive: true, store: { supplier: { status: 'APPROVED' } } },
+      include: {
+        brand: true, cylinderType: true, inventory: { select: { quantity: true } },
+        store: {
+          select: {
+            id: true, name: true, address: true, phone: true, opensAt: true, closesAt: true, isOpen: true,
+            offersDelivery: true, offersPickup: true, deliveryFee: true, areas: { select: { zoneId: true } },
+          },
+        },
+      },
+    });
+    if (!product) throw new NotFoundException('Produit introuvable');
+    const quantity = product.inventory?.quantity ?? 0;
+    return {
+      ...product,
+      available: quantity > 0 && product.store.isOpen && isStoreOpenNow(product.store.opensAt, product.store.closesAt),
+    };
+  }
+
   /**
    * Recherche publique. Ne retourne que les offres réellement commandables :
    * produit actif, stock > 0, fournisseur validé, boutique ouverte (horaires compris),

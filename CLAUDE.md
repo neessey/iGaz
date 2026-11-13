@@ -10,7 +10,27 @@ messages d'erreur, textes d'interface et documentation sont **en français**.
 - Tout ce qui est « reporté » dans le cahier MVP (livreurs plateforme, commissions, abonnements, multi-fournisseurs,
   messagerie, avis, litiges) ne doit **pas** être développé sans accord explicite.
 
-## Commandes (depuis `backend/`)
+## Structure
+
+- `backend/` : API NestJS + Prisma + PostgreSQL
+- `web/` : interface Next.js (App Router, TypeScript), PWA responsive, mobile d'abord. Trois espaces : client (`/`, `/produit/[id]`,
+  `/commandes`), fournisseur (`/fournisseur/*`), administration (`/admin/*`). Design : voir « Design » ci-dessous.
+
+## Commandes du web (depuis `web/`)
+
+- `npm run dev` — interface sur :3001 (`NEXT_PUBLIC_API_URL`, 3000 par défaut)
+- `npm run build` puis `npm run typecheck`
+- Essai local avec données de démonstration : démarrer l'API avec `EXPOSE_DEV_OTP=true` (le code SMS s'affiche à l'écran),
+  puis `npm run seed:demo` côté backend (2 dépôts fictifs : connexion 07 01 00 01 01 / 07 01 00 01 02 ; admin : `ADMIN_PHONE`).
+
+## Design (ne pas diluer)
+
+Identité « acier peint » : papier gris-vert, encre vert sombre, vert émail `#0c6b58`, jaune de signalisation `#ffc21a` réservé aux
+actions principales (lisible en plein soleil), rouille pour les alertes. Titres en Big Shoulders Display, texte en Atkinson
+Hyperlegible 17 px. Le choix de la bouteille se fait en touchant sa silhouette (hauteur proportionnelle à la capacité).
+Pas de majuscules d'étiquette, pas d'animation d'entrée, boutons d'au moins 44 px, textes en français simple, verbes d'action.
+
+## Commandes du backend (depuis `backend/`)
 
 - `npm run start:dev` — API sur :3000 (PostgreSQL requis, voir `docker-compose.yml` et `.env.example`)
 - `npm test` — tests unitaires des règles métier
@@ -31,11 +51,9 @@ messages d'erreur, textes d'interface et documentation sont **en français**.
 
 ## Reste à faire (ordre suggéré)
 
-1. **Interface web** (Next.js + TypeScript, PWA responsive) : espace client (recherche par commune, fiche produit,
-   commande achat/échange, livraison/retrait, suivi), espace fournisseur (boutique, mise à jour rapide du stock sur
-   téléphone, file de commandes, saisie du code de confirmation), administration (validation des fournisseurs,
-   catalogue, commandes, journal d'audit). Brancher sur l'API existante ; ajouter les routes manquantes au besoin
-   (ex. lecture du journal d'audit, statistiques de base, tableau de bord fournisseur).
+1. **Interface web** : fait pour le MVP (client, fournisseur, administration). À faire : manifeste PWA et icônes, mode hors
+   ligne minimal, tests de bout en bout du navigateur dans la CI, tableau de bord de ventes pour le fournisseur, pagination
+   des commandes (l'API renvoie les 100 dernières).
 2. **Prestataire SMS** : implémenter `SmsProvider` (`backend/src/auth/sms.provider.ts`).
 3. **Agrégateur de paiement** (Wave, Orange Money, MTN MoMo) : session de paiement dans `PaymentsService.initiate`,
    signature réelle dans `verifySignature`.

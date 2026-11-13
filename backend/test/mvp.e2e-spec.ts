@@ -77,6 +77,14 @@ describe('iGaz MVP — parcours complet', () => {
     await http().post('/auth/otp/verify').send({ phone, code: bad }).expect(401);
     await http().post('/auth/otp/verify').send({ phone, code: good }).expect(200);
     await http().post('/auth/otp/verify').send({ phone, code: good }).expect(401); // déjà consommé
+
+    // Le code n'est jamais renvoyé par l'API, sauf démonstration locale explicite
+    const hidden = await http().post('/auth/otp/request').send({ phone: '0708888888' }).expect(200);
+    expect(hidden.body.devCode).toBeUndefined();
+    process.env.EXPOSE_DEV_OTP = 'true';
+    const shown = await http().post('/auth/otp/request').send({ phone: '0708888887' }).expect(200);
+    expect(shown.body.devCode).toBe(sms.last.get('+2250708888887'));
+    process.env.EXPOSE_DEV_OTP = 'false';
   });
 
   // --------------------------------------------------------------- catalogue
@@ -92,6 +100,8 @@ describe('iGaz MVP — parcours complet', () => {
     const yop = await http().post('/admin/zones').set(auth('admin')).send({ name: 'Yopougon' }).expect(201);
     Object.assign(ids, { total: total.body.id, petro: petro.body.id, b6: b6.body.id, b12: b12.body.id, cocody: cocody.body.id, yop: yop.body.id });
 
+    await http().get('/admin/zones').set(auth('client')).expect(403);
+    expect((await http().get('/admin/zones').set(auth('admin')).expect(200)).body).toHaveLength(2);
     const brands = await http().get('/catalog/brands').expect(200); // public
     expect(brands.body.map((b: any) => b.name)).toEqual(['Petro Ivoire', 'Total']);
     expect(await prisma.auditLog.count({ where: { entity: 'GasBrand', action: 'CREATE' } })).toBe(2);
@@ -254,6 +264,7 @@ describe('iGaz MVP — parcours complet', () => {
       // Le fournisseur voit la commande, sans le code de confirmation ; l'autre fournisseur ne la voit pas
       const asSupplier = await http().get(`/orders/${order.id}`).set(auth('supA')).expect(200);
       expect(asSupplier.body.confirmationCode).toBeUndefined();
+      expect(asSupplier.body.client.phone).toBe('+225' + phones.client); // le dépôt peut joindre le client
       await http().get(`/orders/${order.id}`).set(auth('supB')).expect(404);
       await http().get(`/orders/${order.id}`).set(auth('client2')).expect(404);
       const listB = await http().get('/orders').set(auth('supB')).expect(200);
@@ -452,6 +463,25 @@ describe('iGaz MVP — parcours complet', () => {
     expect((log!.after as any).quantity).toBe(7);
     const mv = await prisma.stockMovement.findFirst({ where: { productId: ids.prodA, reason: 'ADMIN_CORRECTION' } });
     expect(mv!.note).toContain('Inventaire');
+  });
+
+  it('fiche produit publique, journal d’audit et statistiques réservés à l’admin', async () => {
+    const detail = await http().get(`/products/${ids.prodA}`).expect(200); // public
+    expect(detail.body.brand.name).toBe('Total');
+    expect(detail.body.available).toBe(true);
+    expect(detail.body.store.areas.map((a: any) => a.zoneId)).toEqual([ids.cocody]);
+    await http().get('/products/00000000-0000-0000-0000-000000000000').expect(404);
+
+    await http().get('/admin/audit-logs').expect(401);
+    await http().get('/admin/audit-logs').set(auth('supA')).expect(403);
+    await http().get('/admin/stats').set(auth('client')).expect(403);
+    const logs = await http().get('/admin/audit-logs?limit=5').set(auth('admin')).expect(200);
+    expect(logs.body).toHaveLength(5);
+    expect(logs.body[0].actor.phone).toBeDefined();
+    const stats = await http().get('/admin/stats').set(auth('admin')).expect(200);
+    expect(stats.body.suppliers.APPROVED).toBe(2);
+    expect(stats.body.orders.COMPLETED).toBe(2);
+    expect(stats.body.completedVolume).toBe(11000 + 7500);
   });
 
   it('un fournisseur suspendu ne peut plus agir et disparaît de la recherche', async () => {
