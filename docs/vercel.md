@@ -38,7 +38,17 @@ la clé n'est lisible que par les personnes autorisées sur Vercel.
 (clés propres à la démo, différentes de celles de développement), `ADMIN_PHONE`, `SEED_DEMO`, `JWT_EXPIRES_IN`,
 `COD_MAX_AMOUNT`, `NOTIFY_SUPPLIER_BY_SMS`, `CORS_ORIGIN` (adresses du site), et celles de Neon.
 
-## SMS par Orange
+## SMS par Celcom Africa (prestataire retenu)
+
+`SMS_PROVIDER=celcom` sur `igaz-api` envoie les codes de connexion (et, si `NOTIFY_SUPPLIER_BY_SMS=true`, les alertes
+aux dépôts) par Celcom Africa, vers Orange, MTN et Moov. Sur celcomafrica.com : créer le compte, recharger le crédit
+(mobile money, carte ou virement), faire approuver le nom d'expéditeur (ex. « iGaz CI »), puis copier la clé et
+l'identifiant partenaire (« Get API key & Partner ID ») dans `CELCOM_API_KEY` et `CELCOM_PARTNER_ID`, et le nom
+approuvé dans `CELCOM_SENDER` (réglages du projet sur Vercel, jamais dans le code ni dans une conversation). Crédit
+épuisé, expéditeur refusé… : la connexion affiche « Envoi du SMS impossible » et la cause (code Celcom) apparaît dans
+les journaux de l'API.
+
+## SMS par Orange (en réserve)
 
 `SMS_PROVIDER=orange` sur `igaz-api` envoie les codes de connexion (et, si `NOTIFY_SUPPLIER_BY_SMS=true`, les alertes
 aux dépôts) par l'API SMS d'Orange Developer. À faire sur developer.orange.com : créer l'application, s'abonner à

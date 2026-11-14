@@ -1,7 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { demoModeEnabled } from './demo';
 
-/** Abstraction d'envoi de SMS : Orange (orange-sms.provider.ts) ou affichage dans les journaux, choisi par SmsModule. */
+/** Abstraction d'envoi de SMS : Celcom, Orange ou affichage dans les journaux, choisi par SmsModule (SMS_PROVIDER). */
 export abstract class SmsProvider {
   abstract send(phone: string, message: string): Promise<void>;
 }
