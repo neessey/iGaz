@@ -1,7 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { demoModeEnabled } from './demo';
 
-/** Abstraction d'envoi de SMS. Brancher ici le prestataire retenu (agrégateur SMS ivoirien). */
+/** Abstraction d'envoi de SMS : Orange (orange-sms.provider.ts) ou affichage dans les journaux, choisi par SmsModule. */
 export abstract class SmsProvider {
   abstract send(phone: string, message: string): Promise<void>;
 }

@@ -108,7 +108,8 @@ démo (`DEMO_ACCESS_KEY`) tant qu'il n'y a pas de prestataire SMS : ne jamais re
 1. **Interface web** : fait pour le MVP (client, fournisseur, administration), PWA comprise (manifeste, icônes, page hors
    ligne). À faire : tests de bout en bout du navigateur dans la CI, tableau de bord de ventes pour le fournisseur,
    pagination des commandes (l'API renvoie les 100 dernières).
-2. **Prestataire SMS** : implémenter `SmsProvider` (`backend/src/auth/sms.provider.ts`).
+2. ~~Prestataire SMS~~ : Orange Developer (`orange-sms.provider.ts`, `SMS_PROVIDER=orange`, variables `ORANGE_SMS_*`).
+   Reste : identifiants, forfait et nom d'expéditeur sur le portail Orange.
 3. **Agrégateur de paiement** (Wave, Orange Money, MTN MoMo) : session de paiement dans `PaymentsService.initiate`,
    signature réelle dans `verifySignature`.
 4. ~~Notifications~~ : fait (application, push, SMS optionnel). Reste : clés VAPID de production.

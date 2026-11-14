@@ -38,6 +38,16 @@ la clé n'est lisible que par les personnes autorisées sur Vercel.
 (clés propres à la démo, différentes de celles de développement), `ADMIN_PHONE`, `SEED_DEMO`, `JWT_EXPIRES_IN`,
 `COD_MAX_AMOUNT`, `NOTIFY_SUPPLIER_BY_SMS`, `CORS_ORIGIN` (adresses du site), et celles de Neon.
 
+## SMS par Orange
+
+`SMS_PROVIDER=orange` sur `igaz-api` envoie les codes de connexion (et, si `NOTIFY_SUPPLIER_BY_SMS=true`, les alertes
+aux dépôts) par l'API SMS d'Orange Developer. À faire sur developer.orange.com : créer l'application, s'abonner à
+« SMS Côte d'Ivoire », acheter un forfait (bouton « Configure »), puis copier le **Client ID** et le **Client secret**
+dans les variables `ORANGE_SMS_CLIENT_ID` et `ORANGE_SMS_CLIENT_SECRET` (réglages du projet sur Vercel, jamais dans le
+code ni dans une conversation). Facultatif : `ORANGE_SMS_SENDER_NAME` (ex. « iGaz CI »), seulement une fois approuvé par
+Orange, sinon les envois sont refusés. Sans forfait ou forfait épuisé : la connexion échoue avec « Envoi du SMS
+impossible » et la cause apparaît dans les journaux de l'API. Avec la clé de démo, le code reste aussi affiché à l'écran.
+
 ## Passer en production publique
 
 1. Brancher le prestataire SMS et l'agrégateur de paiement ; compléter `web/lib/legal.ts`.
