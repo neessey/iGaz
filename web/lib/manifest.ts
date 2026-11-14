@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
-/** Manifeste PWA, servi sur /manifest.webmanifest. Couleurs : fond lavande clair de l'application, écran de lancement violet nuit. */
-export default function manifest(): MetadataRoute.Manifest {
+/** Manifeste PWA, servi sur /manifest.webmanifest (app/manifest.webmanifest/route.ts). Couleurs : fond lavande clair de l'application, écran de lancement violet nuit. */
+export function manifest(): MetadataRoute.Manifest {
   return {
     id: '/',
     name: 'iGaz CI : le gaz, simplement',

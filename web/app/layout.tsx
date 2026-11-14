@@ -36,6 +36,10 @@ export const viewport: Viewport = { themeColor: '#f4f3fa', width: 'device-width'
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fr">
+      <head>
+        {/* Manifeste avec la connexion du site (démo protégée par Vercel) : voir app/manifest.webmanifest/route.ts */}
+        <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
+      </head>
       <body>
         <SessionProvider>
           <CartProvider>

@@ -35,7 +35,8 @@ messages d'erreur, textes d'interface et documentation sont **en français**.
 
 - `npm run dev` — interface sur :3001 (`NEXT_PUBLIC_API_URL`, 3000 par défaut)
 - `npm run build` puis `npm run typecheck` (arrêter `npm run dev` avant : les deux écrivent dans `.next`)
-- PWA : `app/manifest.ts`, `public/sw.js` (actif en production seulement), icônes refaites par `npm run icons`.
+- PWA : manifeste `lib/manifest.ts` servi par `app/manifest.webmanifest/route.ts` et déclaré dans `layout.tsx` avec
+  `crossOrigin="use-credentials"` (sinon la protection Vercel bloque l'installation), `public/sw.js` (actif en production seulement), icônes refaites par `npm run icons`.
   Écran de lancement : `components/Splash.tsx` (à chaque ouverture) et images iPhone/iPad (`public/splash`, liste dans
   `lib/apple-splash.json`, refaites par `npm run splash`). Sans compte, l'application s'ouvre sur `/connexion` (première
   ouverture, après déconnexion), sauf choix « Continuer sans compte » ; pages publiques : liste `PUBLIC` de `Shell.tsx`.
