@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { ReorderButton } from '@/components/ReorderButton';
+import { OrderReview } from '@/components/Reviews';
 import { Guard } from '@/components/Shell';
 import { Loading, Notice, PageHead, StatusBadge } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
@@ -146,6 +147,10 @@ function OrderDetail() {
           {' '}Paiement {order.paymentMethod === 'MOBILE_MONEY' ? 'par mobile money' : 'à la remise'}.
         </p>
       </section>
+
+      {order.status === 'COMPLETED' && (
+        <OrderReview key={order.review?.id ?? 'nouveau'} orderId={order.id} storeName={order.store.name} review={order.review} onSaved={load} />
+      )}
 
       {cancellable ? (
         <button className="btn btn-danger btn-block" disabled={busy} onClick={cancel}>Annuler la commande</button>

@@ -77,6 +77,10 @@ function Overview() {
         <span className="cluster" style={{ gap: 10, fontWeight: 800 }}><Icon name="wallet" size={22} />Revenus et relevés des dépôts</span>
         <Icon name="chevron" size={20} />
       </Link>
+      <Link className="card card-link split" href="/admin/avis">
+        <span className="cluster" style={{ gap: 10, fontWeight: 800 }}><Icon name="star" size={22} />Avis des clients</span>
+        <Icon name="chevron" size={20} />
+      </Link>
 
       <section className="stack-sm" aria-labelledby="activite">
         <SectionHead id="activite" title="Activité récente" more={{ href: '/admin/audit' }} />

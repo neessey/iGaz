@@ -77,6 +77,7 @@ model User {
   addresses Address[]
   orders    Order[]
   checkouts Checkout[]
+  reviews   Review[]
   auditLogs AuditLog[]
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
@@ -193,6 +194,10 @@ model Store {
   products    Product[]
   orders      Order[]
   settlements Settlement[]
+  reviews     Review[]
+  // Avis visibles (non masqués) : nombre et somme des notes, tenus à jour avec chaque avis (moyenne sans recalcul)
+  ratingCount Int @default(0)
+  ratingSum   Int @default(0)
 }
 
 model StoreServiceArea {
@@ -304,6 +309,7 @@ model Order {
   checkout Checkout?    @relation(fields: [checkoutId], references: [id], onDelete: Restrict)
   items    OrderItem[]
   events   OrderEvent[]
+  review   Review?
   payments Payment[]
 
   @@index([clientId, createdAt])
@@ -326,6 +332,28 @@ model Checkout {
   payments Payment[]
 
   @@index([clientId, createdAt])
+}
+
+/// Avis d'un client sur le dépôt d'une de ses commandes terminées : un seul par commande (pas d'avis sans achat).
+/// Masqué par l'admin (abus) : n'est plus affiché et ne compte plus dans la moyenne du dépôt.
+model Review {
+  id        String    @id @default(uuid())
+  orderId   String    @unique
+  storeId   String
+  clientId  String
+  rating    Int // 1 à 5
+  comment   String?
+  reply     String? // réponse publique du dépôt, une seule fois
+  repliedAt DateTime?
+  hidden    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  order  Order @relation(fields: [orderId], references: [id])
+  store  Store @relation(fields: [storeId], references: [id])
+  client User  @relation(fields: [clientId], references: [id])
+
+  @@index([storeId, createdAt])
 }
 
 model OrderItem {

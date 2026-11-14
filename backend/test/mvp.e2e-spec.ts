@@ -865,6 +865,109 @@ describe('iGaz MVP — parcours complet', () => {
     });
   });
 
+  describe('avis et notes', () => {
+    const reviews: Record<string, any> = {};
+    // Comptes déjà connectés plus haut : on réutilise leur jeton (la limite anti-abus des codes SMS refuserait un nouveau code).
+    const ensure = async (who: keyof typeof phones) => { if (!tokens[who]) await login(who); };
+    /** Commande du client chez le dépôt A, menée jusqu'à la remise (code du client). */
+    async function completedOrder() {
+      await http().put(`/stores/${ids.storeA}/products/${ids.prodA}/stock`).set(auth('supA')).send({ quantity: 10 }).expect(200);
+      const o = (await http().post('/orders').set(auth('client')).send({
+        storeId: ids.storeA, fulfillment: 'DELIVERY', paymentMethod: 'CASH_ON_DELIVERY', addressId: ids.addr,
+        items: [{ productId: ids.prodA, kind: 'PURCHASE', quantity: 1 }],
+      }).expect(201)).body;
+      await http().post(`/orders/${o.id}/accept`).set(auth('supA')).expect(200);
+      await http().post(`/orders/${o.id}/dispatch`).set(auth('supA')).expect(200);
+      await http().post(`/orders/${o.id}/complete`).set(auth('supA')).send({ code: o.confirmationCode }).expect(200);
+      return o;
+    }
+
+    it('seul le client d’une commande terminée note, une fois ; moyenne à partir de 3 avis ; 30 jours', async () => {
+      await ensure('client');
+      const base = await prisma.store.findUniqueOrThrow({ where: { id: ids.storeA } });
+      // Pas encore remise : pas d'avis
+      const pending = (await http().post('/orders').set(auth('client')).send({
+        storeId: ids.storeA, fulfillment: 'DELIVERY', paymentMethod: 'CASH_ON_DELIVERY', addressId: ids.addr,
+        items: [{ productId: ids.prodA, kind: 'PURCHASE', quantity: 1 }],
+      }).expect(201)).body;
+      await http().put(`/orders/${pending.id}/review`).set(auth('client')).send({ rating: 5 }).expect(409);
+      await http().post(`/orders/${pending.id}/cancel`).set(auth('client')).expect(200);
+
+      const o1 = await completedOrder();
+      await ensure('client2');
+      await http().put(`/orders/${o1.id}/review`).set(auth('client2')).send({ rating: 1 }).expect(404); // pas sa commande
+      await http().put(`/orders/${o1.id}/review`).set(auth('supA')).send({ rating: 5 }).expect(403);
+      await http().put(`/orders/${o1.id}/review`).set(auth('client')).send({ rating: 6 }).expect(400);
+      await http().put(`/orders/${o1.id}/review`).set(auth('client')).send({ rating: 4.5 }).expect(400);
+
+      const r1 = await http().put(`/orders/${o1.id}/review`).set(auth('client')).send({ rating: 4, comment: '  Rapide   et poli ' }).expect(200);
+      expect(r1.body.comment).toBe('Rapide et poli');
+      reviews.first = r1.body;
+      // Modification : toujours un seul avis, moyenne corrigée
+      await http().put(`/orders/${o1.id}/review`).set(auth('client')).send({ rating: 2 }).expect(200);
+      expect(await prisma.review.count({ where: { orderId: o1.id } })).toBe(1);
+      let store = await prisma.store.findUniqueOrThrow({ where: { id: ids.storeA } });
+      expect([store.ratingCount - base.ratingCount, store.ratingSum - base.ratingSum]).toEqual([1, 2]);
+      // Le dépôt est prévenu (une fois, pas à la modification)
+      const supA = await prisma.user.findUniqueOrThrow({ where: { phone: '+225' + phones.supA } });
+      expect(await prisma.notification.count({ where: { userId: supA.id, kind: 'REVIEW_NEW' } })).toBe(1);
+
+      // Public : moins de 3 avis → pas de moyenne ; auteur réduit, jamais de numéro
+      let pub = (await http().get(`/stores/${ids.storeA}/reviews`).expect(200)).body;
+      expect(pub.rating).toEqual({ count: 1, average: null });
+      expect(pub.reviews[0].rating).toBe(2);
+      expect(pub.reviews[0].author).toMatch(/^client$/i); // compte de test sans nom de famille
+      expect(JSON.stringify(pub)).not.toContain(phones.client.slice(1));
+      expect(pub.reviews[0].clientId).toBeUndefined();
+
+      for (const rating of [5, 5]) {
+        const o = await completedOrder();
+        await http().put(`/orders/${o.id}/review`).set(auth('client')).send({ rating }).expect(200);
+      }
+      pub = (await http().get(`/stores/${ids.storeA}/reviews`).expect(200)).body;
+      expect(pub.rating).toEqual({ count: 3, average: 4 }); // (2 + 5 + 5) / 3
+      const offers = (await http().get(`/products?storeId=${ids.storeA}`).expect(200)).body;
+      expect(offers[0].store.rating).toEqual({ count: 3, average: 4 });
+      expect(offers[0].store.ratingSum).toBeUndefined();
+
+      // Plus de 30 jours après la remise : trop tard
+      const late = await completedOrder();
+      await prisma.orderEvent.updateMany({ where: { orderId: late.id, status: 'COMPLETED' }, data: { createdAt: new Date(Date.now() - 31 * 24 * 3600 * 1000) } });
+      await http().put(`/orders/${late.id}/review`).set(auth('client')).send({ rating: 1 }).expect(422);
+      // L'avis apparaît sur la commande du client
+      expect((await http().get(`/orders/${o1.id}`).set(auth('client')).expect(200)).body.review.rating).toBe(2);
+    });
+
+    it('réponse du dépôt cloisonnée et unique ; masquage par l’admin audité et retiré de la moyenne', async () => {
+      const id = reviews.first.id;
+      await http().get(`/stores/${ids.storeA}/reviews/mine`).set(auth('supB')).expect(404);
+      await http().put(`/stores/${ids.storeA}/reviews/${id}/reply`).set(auth('supB')).send({ reply: 'Merci' }).expect(404);
+      await http().put(`/stores/${ids.storeB}/reviews/${id}/reply`).set(auth('supB')).send({ reply: 'Merci' }).expect(404);
+      await http().put(`/stores/${ids.storeA}/reviews/${id}/reply`).set(auth('supA')).send({ reply: '  Merci, à bientôt  ' }).expect(200);
+      await http().put(`/stores/${ids.storeA}/reviews/${id}/reply`).set(auth('supA')).send({ reply: 'Encore' }).expect(409);
+      const client = await prisma.user.findUniqueOrThrow({ where: { phone: '+225' + phones.client } });
+      expect(await prisma.notification.count({ where: { userId: client.id, kind: 'REVIEW_REPLY' } })).toBe(1);
+      let pub = (await http().get(`/stores/${ids.storeA}/reviews`).expect(200)).body;
+      expect(pub.reviews.find((r: any) => r.id === id).reply).toBe('Merci, à bientôt');
+
+      await ensure('admin');
+      await http().patch(`/admin/reviews/${id}`).set(auth('supA')).send({ hidden: true }).expect(403);
+      await http().patch(`/admin/reviews/${id}`).set(auth('admin')).send({ hidden: true, reason: 'Numéro de téléphone' }).expect(200);
+      expect(await prisma.auditLog.count({ where: { action: 'REVIEW_HIDDEN', entityId: id } })).toBe(1);
+      pub = (await http().get(`/stores/${ids.storeA}/reviews`).expect(200)).body;
+      expect(pub.reviews.map((r: any) => r.id)).not.toContain(id);
+      expect(pub.rating).toEqual({ count: 2, average: null }); // sous le seuil
+      const mine = (await http().get(`/stores/${ids.storeA}/reviews/mine`).set(auth('supA')).expect(200)).body;
+      expect(mine.reviews.find((r: any) => r.id === id).hidden).toBe(true);
+      // Masquer deux fois ne décompte qu'une fois ; réafficher rétablit la moyenne
+      await http().patch(`/admin/reviews/${id}`).set(auth('admin')).send({ hidden: true }).expect(200);
+      await http().patch(`/admin/reviews/${id}`).set(auth('admin')).send({ hidden: false }).expect(200);
+      pub = (await http().get(`/stores/${ids.storeA}/reviews`).expect(200)).body;
+      expect(pub.rating).toEqual({ count: 3, average: 4 });
+      expect((await http().get('/admin/reviews').set(auth('admin')).expect(200)).body.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
   describe('prénom et nom', () => {
     it('inscription avec prénom et nom, mis en forme ; les deux sont requis ensemble', async () => {
       const phone = '0701000044';

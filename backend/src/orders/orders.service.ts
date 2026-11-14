@@ -23,6 +23,8 @@ const ORDER_INCLUDE = {
   payments: { select: { id: true, method: true, amount: true, status: true, createdAt: true } },
   // Panier d'origine : réservé au client et à l'admin (retiré pour le dépôt, voir present()).
   checkout: { select: { id: true, code: true, payments: { select: { method: true, status: true, createdAt: true } } } },
+  // Avis du client sur cette commande (visible du client, du dépôt et de l'admin)
+  review: { select: { id: true, rating: true, comment: true, reply: true, repliedAt: true, hidden: true, createdAt: true, updatedAt: true } },
 } satisfies Prisma.OrderInclude;
 
 type FullOrder = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;

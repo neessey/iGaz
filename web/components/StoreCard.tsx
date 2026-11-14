@@ -5,6 +5,7 @@ import { brandColor, productPhoto, STORE_PHOTOS } from '@/lib/media';
 import { closesSoon, StoreSummary } from '@/lib/stores';
 import { Cylinder } from './Cylinder';
 import { Icon } from './Icon';
+import { RatingBadge } from './Reviews';
 
 /** Couverture d'un dépôt : sa photo si elle est fournie, sinon les bouteilles de ses marques sur fond violet nuit. */
 export function StoreCover({ summary, children, className = '' }: { summary: StoreSummary; children?: ReactNode; className?: string }) {
@@ -38,7 +39,7 @@ export function StoreCard({ summary, href }: { summary: StoreSummary; href: stri
         </span>
       </StoreCover>
       <div className="store-body">
-        <span className="store-name">{store.name}</span>
+        <span className="split" style={{ flexWrap: 'nowrap' }}><span className="store-name">{store.name}</span><RatingBadge rating={store.rating} /></span>
         <span className="meta">
           <span>{summary.sizes.join(' · ')}</span>
           <span>{summary.brands.map((b) => b.name).join(', ')}</span>

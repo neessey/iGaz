@@ -626,3 +626,18 @@ dl.facts .total { font-weight: 800; font-size: 1.1rem; color: var(--ink); paddin
   .landing-bottles { height: 360px; }
   .landing-band { padding: 36px 40px; }
 }
+
+/* ---- Avis et notes (components/Reviews.tsx) ---- */
+.stars { color: var(--orange); letter-spacing: 1px; line-height: 1; white-space: nowrap; }
+.stars-off { color: var(--line); }
+.rating { display: inline-flex; align-items: center; gap: 3px; font-weight: 800; font-size: 0.9rem; white-space: nowrap; }
+.rating-star { color: var(--orange); }
+.rating-new { color: var(--violet); background: var(--violet-soft); padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; }
+.review { padding: 14px 0; }
+.review-reply { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--violet-soft); }
+.review-reply strong { display: block; margin-bottom: 2px; }
+.star-input { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.star-input button {
+  width: 44px; height: 44px; border: 0; background: none; cursor: pointer; font-size: 1.9rem; line-height: 1; color: var(--line);
+}
+.star-input button.on { color: var(--orange); }

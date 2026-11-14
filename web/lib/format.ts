@@ -31,6 +31,8 @@ export const AUDIT_LABEL: Record<string, string> = {
   ACCOUNT_DELETED: 'Compte supprimé par son titulaire',
   FEES_UPDATE: 'Frais iGaz modifiés',
   SETTLEMENT: 'Relevé d’un dépôt réglé',
+  REVIEW_HIDDEN: 'Avis masqué',
+  REVIEW_SHOWN: 'Avis réaffiché',
 };
 
 export const dateTime = (iso: string) =>

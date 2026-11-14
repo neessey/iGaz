@@ -7,6 +7,16 @@ export interface StoreLite {
   id: string; name: string; address: string; phone: string; opensAt: string; closesAt: string;
   offersDelivery: boolean; offersPickup: boolean; deliveryFee: number; isOpen?: boolean;
   areas?: { zoneId: string }[];
+  /** Note publique du dépôt (moyenne à partir de 3 avis, sinon null : « Nouveau »). */
+  rating?: Rating;
+}
+
+export interface Rating { count: number; average: number | null }
+
+/** Avis public sur un dépôt (auteur réduit à « Prénom I. »). */
+export interface Review {
+  id: string; rating: number; comment: string | null; reply: string | null; repliedAt: string | null;
+  createdAt: string; author: string; hidden?: boolean; order?: { code: string };
 }
 export interface Offer {
   id: string; purchasePrice: number; exchangePrice: number; brandId: string; cylinderTypeId: string;
@@ -25,6 +35,8 @@ export interface Order {
   serviceFee?: number;
   /** Part d'iGaz sur la livraison (visible par le dépôt et l'admin seulement). */
   platformShare?: number;
+  /** Avis du client sur cette commande, une fois remise. */
+  review?: { id: string; rating: number; comment: string | null; reply: string | null; hidden: boolean } | null;
   client?: { name: string | null; phone: string };
   store: { id: string; name: string; address: string; phone: string };
   items: { id: string; productId: string; kind: 'PURCHASE' | 'EXCHANGE'; quantity: number; unitPrice: number;

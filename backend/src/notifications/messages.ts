@@ -55,7 +55,7 @@ export function orderMessages(event: OrderNotifyEvent, o: OrderSnapshot): OrderM
       return [client('ORDER_OUT', 'Votre gaz est en route',
         `${o.storeName} vous livre la commande #${o.code}. Donnez votre code de remise au livreur à la réception.`)];
     case 'COMPLETED':
-      return [client('ORDER_COMPLETED', 'Commande terminée', `Merci ! La commande #${o.code} est remise. Bon gaz !`)];
+      return [client('ORDER_COMPLETED', 'Commande terminée', `Merci ! La commande #${o.code} est remise. Notez ${o.storeName} en un geste.`)];
     case 'CANCELLED_BY_CLIENT':
       // Le dépôt n'est prévenu que s'il voyait déjà la commande (une commande non payée ne lui a jamais été transmise).
       return o.wasVisibleToStore

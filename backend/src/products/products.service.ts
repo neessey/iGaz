@@ -2,10 +2,17 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Prisma, StockReason, User } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { isStoreOpenNow } from '../orders/order-rules';
+import { storeRating } from '../reviews/review-rules';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
 import { photoError, sniffPhotoType } from './photo-rules';
 import { CreateProductDto, SearchProductsQuery, UpdateProductDto } from './products.dto';
+
+/** Note publique du dépôt (moyenne à partir de 3 avis) à la place des compteurs bruts. */
+function withRating<T extends { store: { ratingCount: number; ratingSum: number } }>(p: T) {
+  const { ratingCount, ratingSum, ...store } = p.store;
+  return { ...p, store: { ...store, rating: storeRating(ratingCount, ratingSum) } };
+}
 
 @Injectable()
 export class ProductsService {
@@ -157,6 +164,7 @@ export class ProductsService {
           select: {
             id: true, name: true, address: true, phone: true, opensAt: true, closesAt: true, isOpen: true,
             offersDelivery: true, offersPickup: true, deliveryFee: true, areas: { select: { zoneId: true } },
+            ratingCount: true, ratingSum: true,
           },
         },
       },
@@ -164,7 +172,7 @@ export class ProductsService {
     if (!product) throw new NotFoundException('Produit introuvable');
     const quantity = product.inventory?.quantity ?? 0;
     return {
-      ...product,
+      ...withRating(product),
       available: quantity > 0 && product.store.isOpen && isStoreOpenNow(product.store.opensAt, product.store.closesAt),
     };
   }
@@ -200,13 +208,13 @@ export class ProductsService {
           select: {
             id: true, name: true, address: true, phone: true, opensAt: true, closesAt: true,
             offersDelivery: true, offersPickup: true, deliveryFee: true,
-            areas: { select: { zoneId: true } },
+            areas: { select: { zoneId: true } }, ratingCount: true, ratingSum: true,
           },
         },
       },
       orderBy: { purchasePrice: 'asc' },
       take: 200,
     });
-    return products.filter((p) => isStoreOpenNow(p.store.opensAt, p.store.closesAt, now)).slice(0, 50);
+    return products.filter((p) => isStoreOpenNow(p.store.opensAt, p.store.closesAt, now)).slice(0, 50).map(withRating);
   }
 }

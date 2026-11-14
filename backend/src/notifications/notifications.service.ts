@@ -58,6 +58,16 @@ export class NotificationsService {
     }
   }
 
+  /** Notification simple à un utilisateur (avis, réponse…), dans l'application et en push. Ne lève jamais d'erreur. */
+  async notifyUser(userId: string, m: { kind: string; title: string; body: string; url: string; orderId?: string }) {
+    try {
+      await this.prisma.notification.create({ data: { userId, kind: m.kind, title: m.title, body: m.body, url: m.url, orderId: m.orderId } });
+      await this.pushTo(userId, { title: m.title, body: m.body, url: m.url });
+    } catch (e) {
+      this.logger.warn(`Notification non envoyée (${m.kind}) : ${(e as Error).message}`);
+    }
+  }
+
   private async pushTo(userId: string, payload: { title: string; body: string; url: string }) {
     if (!this.push.enabled) return;
     const subs = await this.prisma.pushSubscription.findMany({ where: { userId } });

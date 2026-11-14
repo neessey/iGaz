@@ -5,6 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { AddToCartSheet } from '@/components/AddToCart';
 import { Cylinder } from '@/components/Cylinder';
 import { Icon } from '@/components/Icon';
+import { RatingBadge, StoreReviews } from '@/components/Reviews';
 import { StoreCover } from '@/components/StoreCard';
 import { Empty, Loading, Notice } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
@@ -72,6 +73,7 @@ function StorePage() {
 
       <section className="card store-head stack-sm">
         <h1 style={{ fontSize: '1.45rem' }}>{store.name}</h1>
+        <a href="#avis" style={{ color: 'inherit', textDecoration: 'none', alignSelf: 'flex-start' }}><RatingBadge rating={store.rating} long /></a>
         <p className="meta"><span><Icon name="pin" size={15} />{store.address}</span></p>
         <div className="cluster" style={{ gap: 8 }}>
           {store.offersDelivery && (
@@ -122,6 +124,8 @@ function StorePage() {
       </div>
 
       <p className="small muted">Prix en FCFA. L’échange suppose une bouteille vide de même marque et même taille.</p>
+
+      <StoreReviews storeId={store.id} storeName={store.name} />
 
       {adding && <AddToCartSheet offer={adding} onClose={() => setAdding(null)} onAdded={setToast} />}
     </div>

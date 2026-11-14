@@ -12,7 +12,13 @@ messages d'erreur, textes d'interface et documentation sont **en français**.
   Le 13/11/2026, le propriétaire a donné son accord pour développer ceux que montre la maquette (messagerie, avis et notes,
   espace livreur, abonnements, promotions, panier multi-dépôts), **chacun après validation d'un plan** (base + API + interface).
   Litiges restent reportés. Fait : panier multi-dépôts, et (plan validé le 13/11/2026) la rémunération d'iGaz ci-dessous.
-  Ordre proposé ensuite : avis et notes, promotions, messagerie, espace livreur, abonnements.
+  Fait aussi (plan validé le 14/11/2026) : avis et notes, voir ci-dessous.
+  Ordre proposé ensuite : promotions, messagerie, espace livreur, abonnements.
+- Avis et notes (`backend/src/reviews/`, règles dans `review-rules.ts`) : un avis par commande **terminée**, par son client,
+  dans les 30 jours après la remise ; note entière 1 à 5 (contrainte en base), commentaire facultatif. Moyenne publique à
+  partir de 3 avis visibles (sinon « Nouveau »), compteurs `ratingCount`/`ratingSum` du dépôt tenus à jour dans la même
+  transaction. Auteur affiché « Prénom I. », jamais le numéro. Réponse publique du dépôt une seule fois (cloisonnée, 404).
+  Masquage par l'admin (`/admin/avis`, audit `REVIEW_HIDDEN`/`REVIEW_SHOWN`), retiré de la moyenne.
 - Rémunération d'iGaz (`backend/src/revenue/`, règles dans `fees.ts`) : frais de service par commande payés par le client
   (100 F pendant le pilote, seed) et part sur les frais de livraison payée par le dépôt (0 F pendant le pilote), réglés
   par l'admin (page `/admin/revenus`, audit `FEES_UPDATE`), **figés sur la commande** (`serviceFee`, `platformShare`).
