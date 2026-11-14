@@ -1,5 +1,5 @@
 import {
-  BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, UnauthorizedException,
+  BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, Logger, UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -33,6 +33,8 @@ export class AuthService {
     return phone;
   }
 
+  private readonly logger = new Logger('Auth');
+
   async requestOtp(rawPhone: string, demoKey?: string) {
     const phone = this.phoneOrThrow(rawPhone);
 
@@ -52,10 +54,17 @@ export class AuthService {
         expiresAt: new Date(Date.now() + ttl * 1000),
       },
     });
-    await this.sms.send(phone, `iGaz : votre code de connexion est ${code}. Il expire dans ${Math.round(ttl / 60)} min.`);
     // Démonstration locale (EXPOSE_DEV_OTP=true, jamais en production) ou démo en ligne protégée par clé (voir demo.ts).
     const local = this.config.get('EXPOSE_DEV_OTP') === 'true' && process.env.NODE_ENV !== 'production';
     const expose = local || demoKeyMatches(this.config.get<string>('DEMO_ACCESS_KEY'), demoKey);
+    try {
+      await this.sms.send(phone, `iGaz : votre code de connexion est ${code}. Il expire dans ${Math.round(ttl / 60)} min.`);
+    } catch (e) {
+      // En démo, le code est affiché à l'écran : un SMS raté (prestataire sans crédit…) n'empêche pas de se connecter.
+      if (!expose) throw e;
+      this.logger.warn(`SMS non envoyé, code affiché (démo) : ${(e as Error).message}`);
+      return { sent: false, devCode: code };
+    }
     return expose ? { sent: true, devCode: code } : { sent: true };
   }
 

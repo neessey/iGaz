@@ -3,7 +3,7 @@ process.env.JWT_SECRET = 'test-secret-test-secret-test-secret';
 process.env.PAYMENT_WEBHOOK_SECRET = 'webhook-test-secret';
 process.env.COD_MAX_AMOUNT = '100000';
 
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ServiceUnavailableException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { createHmac, randomUUID } from 'crypto';
 import request from 'supertest';
@@ -16,7 +16,10 @@ import { PrismaService } from '../src/prisma/prisma.service';
 class FakeSms extends SmsProvider {
   last = new Map<string, string>();
   messages: { phone: string; message: string }[] = [];
+  /** Simule un prestataire en panne (crédit épuisé…). */
+  failing = false;
   async send(phone: string, message: string) {
+    if (this.failing) throw new ServiceUnavailableException('Envoi du SMS impossible pour le moment. Réessayez dans un instant.');
     this.messages.push({ phone, message });
     const code = /code de connexion est (\d{6})/.exec(message);
     if (code) this.last.set(phone, code[1]);
@@ -113,6 +116,15 @@ describe('iGaz MVP — parcours complet', () => {
     expect(badKey.body.devCode).toBeUndefined();
     const goodKey = await http().post('/auth/otp/request').set('x-igaz-demo', process.env.DEMO_ACCESS_KEY).send({ phone: '0708888886' }).expect(200);
     expect(goodKey.body.devCode).toBe(sms.last.get('+2250708888886'));
+
+    // Prestataire SMS en panne : la démo affiche quand même le code ; sans clé de démo, l'erreur reste
+    sms.failing = true;
+    await http().post('/auth/otp/request').send({ phone: '0708888885' }).expect(503);
+    const fallback = await http().post('/auth/otp/request').set('x-igaz-demo', process.env.DEMO_ACCESS_KEY).send({ phone: '0708888884' }).expect(200);
+    expect(fallback.body).toMatchObject({ sent: false });
+    expect(fallback.body.devCode).toMatch(/^\d{6}$/);
+    sms.failing = false;
+    await http().post('/auth/otp/verify').send({ phone: '0708888884', code: fallback.body.devCode }).expect(200);
     delete process.env.DEMO_ACCESS_KEY;
   });
 
