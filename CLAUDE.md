@@ -103,7 +103,9 @@ démo (`DEMO_ACCESS_KEY`) tant qu'il n'y a pas de prestataire SMS : ne jamais re
   page publique `/compte/supprimer`), pages `/conditions`, `/confidentialite`, `/aide`, route
   `/.well-known/assetlinks.json` (variables `ANDROID_PACKAGE_NAME`, `ANDROID_SHA256_FINGERPRINTS`), visuels de fiche
   (`npm run store-assets`).
-- Bloquant, dépend du propriétaire : `web/lib/legal.ts` à compléter (société, contacts), relecture juridique des textes,
+- Société : iGaz CI est un nom commercial de la société familiale **Alees** (RCCM CI-ABJ-03-2021-B12-05029, Cocody
+  Angré 8e tranche), renseignée dans `web/lib/legal.ts` (e-mail de contact provisoire, une adresse iGaz est prévue).
+- Bloquant, dépend du propriétaire : relecture juridique des textes,
   hébergement HTTPS, prestataire SMS, agrégateur de paiement, accès des testeurs Google (connexion par SMS), compte Play.
 - Fait aussi : notifications (dans l'application, push Web Push, SMS optionnel au dépôt ; textes dans
   `backend/src/notifications/messages.ts`, jamais de code de remise) et « Commander à nouveau ».
