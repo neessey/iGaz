@@ -1,5 +1,5 @@
 import {
-  BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException,
+  BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional, UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Payment, Prisma, User } from '@prisma/client';
@@ -7,6 +7,9 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { PaymentWebhookDto } from './payments.dto';
+import { PaystackClient } from './paystack';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Cible d'un paiement mobile money : une commande directe ou un panier multi-dépôts (un seul paiement). */
 type Target = { orderId: string } | { checkoutId: string };
@@ -17,6 +20,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly notifications: NotificationsService,
+    @Optional() @Inject(PaystackClient) private readonly paystack: PaystackClient | null = null,
   ) {}
 
   /**
@@ -52,32 +56,63 @@ export class PaymentsService {
     const byKey = await this.prisma.payment.findUnique({ where: { idempotencyKey } });
     if (byKey) {
       if (!sameTarget(byKey)) throw new ConflictException('Clé d’idempotence déjà utilisée');
-      return this.view(byKey);
+      return this.view(await this.withSession(byKey));
     }
     const pending = await this.prisma.payment.findFirst({ where: { ...target, status: 'PENDING' } });
-    if (pending) return this.view(pending);
+    if (pending) return this.view(await this.withSession(pending));
 
     try {
       const payment = await this.prisma.payment.create({ data: { ...target, method: 'MOBILE_MONEY', amount, idempotencyKey } });
-      return this.view(payment);
+      return this.view(await this.withSession(payment));
     } catch (e) {
       // Double clic simultané : l'une des deux requêtes perd la course sur la contrainte d'unicité.
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
         const existing = await this.prisma.payment.findFirst({
           where: { OR: [{ idempotencyKey }, { ...target, status: 'PENDING' }] },
         });
-        if (existing) return this.view(existing);
+        if (existing) return this.view(await this.withSession(existing));
       }
       throw e;
     }
   }
 
+  /**
+   * Page de paiement Paystack d'un paiement en attente, créée une seule fois (référence Paystack = id du paiement)
+   * puis réutilisée. Si Paystack refuse, le paiement passe en échec : le client pourra réessayer (nouveau paiement).
+   */
+  private async withSession(p: Payment): Promise<Payment> {
+    if (!this.paystack || p.status !== 'PENDING' || p.checkoutUrl) return p;
+    const web = (this.config.get<string>('APP_URL') ?? this.config.get<string>('CORS_ORIGIN')?.split(',').pop() ?? '').trim().replace(/\/$/, '');
+    const back = p.orderId ? `/commandes/${p.orderId}` : `/commandes/panier/${p.checkoutId}`;
+    try {
+      const { url } = await this.paystack.initialize({
+        reference: p.id, amount: p.amount, callbackUrl: `${web}${back}`,
+        metadata: p.orderId ? { orderId: p.orderId } : { checkoutId: p.checkoutId! },
+      });
+      return await this.prisma.payment.update({ where: { id: p.id }, data: { checkoutUrl: url } });
+    } catch (e) {
+      await this.prisma.payment.updateMany({ where: { id: p.id, status: 'PENDING' }, data: { status: 'FAILED' } });
+      throw e;
+    }
+  }
+
   private view(p: Payment) {
-    // checkoutUrl : renseigné par l'intégration de l'agrégateur de paiement (à brancher).
-    return {
-      id: p.id, orderId: p.orderId, checkoutId: p.checkoutId, amount: p.amount, status: p.status,
-      checkoutUrl: null as string | null,
-    };
+    return { id: p.id, orderId: p.orderId, checkoutId: p.checkoutId, amount: p.amount, status: p.status, checkoutUrl: p.checkoutUrl };
+  }
+
+  /**
+   * Notification Paystack : signature HMAC-SHA512 vérifiée, puis transaction revérifiée auprès de Paystack (jamais
+   * crue sur parole). Seul « charge.success » confirme un paiement ; le reste est accusé et ignoré.
+   */
+  async handlePaystack(rawBody: Buffer | undefined, signature: string | undefined, event: { event?: string; data?: { reference?: string } }) {
+    if (!this.paystack) throw new NotFoundException('Paiement en ligne non configuré');
+    if (!this.paystack.signatureValid(rawBody, signature)) throw new UnauthorizedException('Signature invalide');
+    const reference = event?.data?.reference;
+    if (event?.event !== 'charge.success' || !reference || !UUID.test(reference)) return { ok: true, ignored: true };
+    const tx = await this.paystack.verify(reference);
+    if (!tx.succeeded) return { ok: true, ignored: true };
+    if (tx.currency !== 'XOF') throw new BadRequestException('Devise inattendue');
+    return this.handleWebhook({ reference, status: 'SUCCEEDED', amount: tx.amount, providerRef: tx.providerRef });
   }
 
   /** Vérifie la signature HMAC-SHA256 du corps brut. Le schéma exact sera aligné sur celui de l'agrégateur retenu. */

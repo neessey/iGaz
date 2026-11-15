@@ -27,6 +27,16 @@ export class PaymentsController {
     return this.payments.initiateCheckout(user, checkoutId, dto.idempotencyKey);
   }
 
+  /** Notification de Paystack (adresse à déclarer dans le tableau de bord Paystack, rubrique Webhooks). */
+  @Public() @Post('payments/paystack/webhook') @HttpCode(200)
+  paystackWebhook(
+    @Req() req: { rawBody?: Buffer },
+    @Headers('x-paystack-signature') signature: string | undefined,
+    @Body() event: { event?: string; data?: { reference?: string } },
+  ) {
+    return this.payments.handlePaystack(req.rawBody, signature, event);
+  }
+
   /** Appelée par l'agrégateur, pas par un utilisateur : authentifiée par signature du corps brut. */
   @Public() @Post('payments/webhook') @HttpCode(200)
   webhook(

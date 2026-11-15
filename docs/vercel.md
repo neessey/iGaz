@@ -38,6 +38,15 @@ la clé n'est lisible que par les personnes autorisées sur Vercel.
 (clés propres à la démo, différentes de celles de développement), `ADMIN_PHONE`, `SEED_DEMO`, `JWT_EXPIRES_IN`,
 `COD_MAX_AMOUNT`, `NOTIFY_SUPPLIER_BY_SMS`, `CORS_ORIGIN` (adresses du site), et celles de Neon.
 
+## Paiement par Paystack
+
+Avec `PAYSTACK_SECRET_KEY` sur `igaz-api`, le paiement mobile money ouvre la page de paiement Paystack (Wave,
+Orange Money, MTN, carte) puis revient sur la commande. Commencer par la **clé de test** (`sk_test_…`) : aucun argent
+réel. Dans le tableau de bord Paystack (Settings → API Keys & Webhooks), déclarer l'adresse de notification
+`https://igaz-api.vercel.app/payments/paystack/webhook`. Chaque notification est vérifiée (signature HMAC-SHA512) puis
+revérifiée auprès de Paystack avant de confirmer une commande. Facultatif : `PAYSTACK_WEBHOOK_SECRET` (clé de signature
+des webhooks, si Paystack en fournit une), `APP_URL` (adresse du site pour le retour).
+
 ## SMS par Celcom Africa (prestataire retenu)
 
 `SMS_PROVIDER=celcom` sur `igaz-api` envoie les codes de connexion (et, si `NOTIFY_SUPPLIER_BY_SMS=true`, les alertes

@@ -10,6 +10,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { setupApp } from '../src/app.setup';
 import { SmsProvider } from '../src/auth/sms.provider';
+import { PaystackClient } from '../src/payments/paystack';
 import { PushPayload, PushSender, PushTarget } from '../src/notifications/push.sender';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -25,6 +26,21 @@ class FakeSms extends SmsProvider {
     if (code) this.last.set(phone, code[1]);
   }
 }
+
+/** Paystack factice : crée des pages de paiement et répond aux contre-vérifications selon les paiements marqués payés. */
+const paystackCalls: string[] = [];
+const paystackPaid = new Map<string, number>(); // référence → montant payé (XOF)
+const paystackHttp = (async (url: string, init?: RequestInit) => {
+  paystackCalls.push(url);
+  if (url.endsWith('/transaction/initialize')) {
+    const b = JSON.parse(init!.body as string);
+    return Response.json({ status: true, data: { authorization_url: `https://checkout.paystack.test/${b.reference}`, reference: b.reference, access_code: 'x' } });
+  }
+  const ref = decodeURIComponent(url.split('/').pop()!);
+  const paid = paystackPaid.get(ref);
+  return Response.json({ status: true, data: { status: paid === undefined ? 'abandoned' : 'success', amount: (paid ?? 0) * 100, currency: 'XOF', id: 4242, reference: ref } });
+}) as unknown as typeof fetch;
+const paystack = new PaystackClient({ secretKey: 'sk_test_e2e', customerEmail: 'c-{id}@test.ci' }, paystackHttp);
 
 /** Push factice : garde les envois ; l'abonnement « gone » est expiré côté service de push. */
 class FakePush extends PushSender {
@@ -67,6 +83,7 @@ describe('iGaz MVP — parcours complet', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(SmsProvider).useValue(sms)
       .overrideProvider(PushSender).useValue(push)
+      .overrideProvider(PaystackClient).useValue(paystack)
       .compile();
     app = setupApp(moduleRef.createNestApplication({ rawBody: true }));
     await app.init();
@@ -977,6 +994,61 @@ describe('iGaz MVP — parcours complet', () => {
       pub = (await http().get(`/stores/${ids.storeA}/reviews`).expect(200)).body;
       expect(pub.rating).toEqual({ count: 3, average: 4 });
       expect((await http().get('/admin/reviews').set(auth('admin')).expect(200)).body.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  describe('paiement Paystack', () => {
+    const raw = (o: object) => JSON.stringify(o);
+    const sig = (body: string, key = 'sk_test_e2e') => createHmac('sha512', key).update(body).digest('hex');
+    const notify = (body: string, signature?: string) => {
+      const r = http().post('/payments/paystack/webhook').set('Content-Type', 'application/json');
+      if (signature) r.set('x-paystack-signature', signature);
+      return r.send(body);
+    };
+    async function mmOrder() {
+      if (!tokens.client2) await login('client2');
+      await http().put(`/stores/${ids.storeB}/products/${ids.prodB}/stock`).set(auth('supB')).send({ quantity: 5 }).expect(200);
+      const addr = await http().post('/addresses').set(auth('client2')).send({ zoneId: ids.yop, details: 'Niangon, test Paystack' }).expect(201);
+      return (await http().post('/orders').set(auth('client2')).send({
+        storeId: ids.storeB, fulfillment: 'DELIVERY', paymentMethod: 'MOBILE_MONEY', addressId: addr.body.id,
+        items: [{ productId: ids.prodB, kind: 'PURCHASE', quantity: 1 }],
+      }).expect(201)).body;
+    }
+
+    it('page de paiement créée une seule fois ; confirmation seulement par notification signée ET revérifiée chez Paystack', async () => {
+      const order = await mmOrder();
+      const before = paystackCalls.filter((u) => u.endsWith('/initialize')).length;
+      const p = await http().post(`/orders/${order.id}/payments`).set(auth('client2')).send({ idempotencyKey: 'paystack-cle-0001' }).expect(200);
+      expect(p.body.checkoutUrl).toBe(`https://checkout.paystack.test/${p.body.id}`);
+      const again = await http().post(`/orders/${order.id}/payments`).set(auth('client2')).send({ idempotencyKey: 'paystack-cle-0001' }).expect(200);
+      expect(again.body.checkoutUrl).toBe(p.body.checkoutUrl);
+      expect(paystackCalls.filter((u) => u.endsWith('/initialize')).length - before).toBe(1); // double clic : une seule session
+
+      const body = raw({ event: 'charge.success', data: { reference: p.body.id, amount: order.total * 100, currency: 'XOF' } });
+      await notify(body).expect(401);
+      await notify(body, sig(body, 'mauvaise-cle')).expect(401);
+      // Notification « succès » mais Paystack dit non (pas encore payé) : rien ne bouge
+      expect((await notify(body, sig(body)).expect(200)).body.ignored).toBe(true);
+      expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('PENDING_PAYMENT');
+
+      paystackPaid.set(p.body.id, order.total);
+      await notify(body, sig(body)).expect(200);
+      expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('SUBMITTED');
+      const pay = await prisma.payment.findUniqueOrThrow({ where: { id: p.body.id } });
+      expect([pay.status, pay.providerRef]).toEqual(['SUCCEEDED', '4242']);
+      expect((await notify(body, sig(body)).expect(200)).body.duplicate).toBe(true); // rejeu sans effet
+      // Autre événement : accusé et ignoré
+      const other = raw({ event: 'transfer.success', data: { reference: p.body.id } });
+      expect((await notify(other, sig(other)).expect(200)).body.ignored).toBe(true);
+    });
+
+    it('montant payé différent du montant dû : refusé, commande toujours en attente', async () => {
+      const order = await mmOrder();
+      const p = await http().post(`/orders/${order.id}/payments`).set(auth('client2')).send({ idempotencyKey: 'paystack-cle-0002' }).expect(200);
+      paystackPaid.set(p.body.id, order.total - 1);
+      const body = raw({ event: 'charge.success', data: { reference: p.body.id } });
+      await notify(body, sig(body)).expect(400);
+      expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('PENDING_PAYMENT');
     });
   });
 

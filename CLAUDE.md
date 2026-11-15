@@ -120,8 +120,10 @@ démo (`DEMO_ACCESS_KEY`) tant qu'il n'y a pas de prestataire SMS : ne jamais re
 2. ~~Prestataire SMS~~ : Celcom Africa retenu (`celcom-sms.provider.ts`, `SMS_PROVIDER=celcom`, variables `CELCOM_*`) ;
    Orange Developer en réserve (`orange-sms.provider.ts`, `SMS_PROVIDER=orange`). Choix dans `sms.module.ts`.
    Reste : compte, crédit et nom d'expéditeur chez Celcom.
-3. **Agrégateur de paiement** (Wave, Orange Money, MTN MoMo) : session de paiement dans `PaymentsService.initiate`,
-   signature réelle dans `verifySignature`.
+3. ~~Agrégateur de paiement~~ : **Paystack** branché (`payments/paystack.ts`, `PAYSTACK_SECRET_KEY`, webhook
+   `/payments/paystack/webhook` signé HMAC-SHA512 puis revérifié par `/transaction/verify` ; montants XOF ×100 ; page de
+   paiement gardée dans `Payment.checkoutUrl`). Reste : activation du compte (compte bancaire au nom d'Alees),
+   reversements aux dépôts. Le webhook générique `/payments/webhook` (`x-igaz-signature`) sert aux tests.
 4. ~~Notifications~~ : fait (application, push, SMS optionnel). Reste : clés VAPID de production.
 5. **Stockage des documents fournisseurs** (aujourd'hui : URL seulement).
 6. **Limitation de débit**, CI GitHub Actions (tests unitaires + e2e avec PostgreSQL), remboursements manuels côté admin.

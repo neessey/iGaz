@@ -394,6 +394,7 @@ model Payment {
   status         PaymentStatus @default(PENDING)
   idempotencyKey String        @unique
   providerRef    String?       @unique
+  checkoutUrl    String? // page de paiement de l'agrégateur (Paystack), réutilisée si le client réessaie
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
