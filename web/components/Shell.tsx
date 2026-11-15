@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
 import { useCart } from '@/lib/cart';
 import { isStandalone, prefersWeb } from '@/lib/install';
+import { VITRINE, VITRINE_PAGES } from '@/lib/site';
 import { useSession } from '@/lib/session';
 import { Role } from '@/lib/types';
 import { Bell } from './Bell';
@@ -44,9 +45,38 @@ const TABS: Record<Role, Tab[]> = {
 const BARE = ['/connexion', '/presentation'];
 
 /** Pages ouvertes sans compte ni écran de connexion (liens publics exigés par le Play Store, page hors ligne). */
-const PUBLIC = ['/connexion', '/presentation', '/conditions', '/confidentialite', '/aide', '/compte/supprimer', '/hors-ligne'];
+const PUBLIC = ['/connexion', '/presentation', '/conditions', '/confidentialite', '/remboursements', '/aide', '/compte/supprimer', '/hors-ligne'];
 
+/**
+ * Site vitrine (lib/site.ts) : présentation et pages légales seulement, sans connexion ni barre d'onglets. Toute autre
+ * adresse renvoie vers la présentation.
+ */
+function VitrineShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const allowed = VITRINE_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  useEffect(() => { if (!allowed) router.replace('/presentation'); }, [allowed, router]);
+  if (!allowed) return <Splash />;
+  if (pathname === '/presentation') return <>{children}</>;
+  return (
+    <>
+      <header className="appbar">
+        <div className="appbar-in">
+          <Logo size={36} href="/presentation" />
+          <Link className="pill-link" href="/presentation">Découvrir iGaz</Link>
+        </div>
+      </header>
+      <main className="page" style={{ paddingBottom: 40 }}>{children}</main>
+    </>
+  );
+}
+
+/** Site vitrine ou application : choisi à la compilation (NEXT_PUBLIC_SITE_MODE). */
 export function Shell({ children }: { children: ReactNode }) {
+  return VITRINE ? <VitrineShell>{children}</VitrineShell> : <AppShell>{children}</AppShell>;
+}
+
+function AppShell({ children }: { children: ReactNode }) {
   const { user, ready, guest } = useSession();
   const cart = useCart();
   const pathname = usePathname();

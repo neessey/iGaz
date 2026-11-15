@@ -52,7 +52,7 @@ export default function Terms() {
         </p>
 
         <h2>7. Annulation et remboursement</h2>
-        <p>Vous pouvez annuler tant que le dépôt n’a pas accepté la commande. Ensuite, contactez le dépôt ou le support. Un paiement en ligne d’une commande annulée ou refusée est remboursé.</p>
+        <p>Vous pouvez annuler tant que le dépôt n’a pas accepté la commande. Ensuite, contactez le dépôt ou le support. Un paiement en ligne d’une commande annulée ou refusée est remboursé : voir <Link href="/remboursements">Annulation et remboursement</Link>.</p>
 
         <h2>8. Sécurité</h2>
         <p>Vérifiez l’état de la bouteille et du joint à la remise. Refusez une bouteille abîmée ou qui sent le gaz. En cas de fuite ou d’incendie, appelez les sapeurs-pompiers (GSPM) au <strong>180</strong>.</p>

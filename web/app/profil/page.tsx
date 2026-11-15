@@ -37,6 +37,7 @@ const LINKS: Record<Role, { href: string; label: string; icon: IconName }[]> = {
 const INFO: { href: string; label: string; icon: IconName }[] = [
   { href: '/aide', label: 'Aide et contact', icon: 'phone' },
   { href: '/conditions', label: 'Conditions d’utilisation', icon: 'journal' },
+  { href: '/remboursements', label: 'Annulation et remboursement', icon: 'wallet' },
   { href: '/confidentialite', label: 'Confidentialité', icon: 'shield' },
 ];
 

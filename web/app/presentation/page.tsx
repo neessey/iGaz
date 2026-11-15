@@ -3,6 +3,11 @@ import Link from 'next/link';
 import { InstallApp } from '@/components/InstallApp';
 import { Icon, IconName } from '@/components/Icon';
 import { Logo } from '@/components/Logo';
+import { COMPANY } from '@/lib/legal';
+import { VITRINE } from '@/lib/site';
+
+/** Contact WhatsApp du support, avec un message déjà rédigé. */
+const whatsapp = (text: string) => (COMPANY.whatsapp ? `https://wa.me/${COMPANY.whatsapp}?text=${encodeURIComponent(text)}` : '/aide');
 
 export const metadata: Metadata = {
   title: 'iGaz CI : votre gaz livré à Abidjan',
@@ -33,7 +38,7 @@ export default function Presentation() {
         <div className="landing-in">
           <nav className="landing-nav" aria-label="iGaz CI">
             <Logo light size={36} href={null} />
-            <Link className="pill-link on-night" href="/connexion">Se connecter</Link>
+            {!VITRINE && <Link className="pill-link on-night" href="/connexion">Se connecter</Link>}
           </nav>
           <div className="landing-hero-grid">
             <div className="stack">
@@ -43,8 +48,17 @@ export default function Presentation() {
                 Trouvez une bouteille disponible près de chez vous, rechargez ou achetez, et suivez votre commande jusqu’à
                 votre porte.
               </p>
-              <InstallApp light />
-              <p className="small" style={{ opacity: 0.8 }}>Gratuit. Bientôt sur Google Play.</p>
+              {VITRINE ? (
+                <div className="stack-sm">
+                  <span className="badge" style={{ alignSelf: 'flex-start', background: 'var(--orange)', color: '#fff' }}>Lancement bientôt à Abidjan</span>
+                  <p className="small" style={{ opacity: 0.85, margin: 0 }}>L’application arrive bientôt sur Android et iPhone. Gratuite pour les clients.</p>
+                </div>
+              ) : (
+                <>
+                  <InstallApp light />
+                  <p className="small" style={{ opacity: 0.8 }}>Gratuit. Bientôt sur Google Play.</p>
+                </>
+              )}
             </div>
             <div className="landing-bottles" aria-hidden="true">
               <img src="/images/bouteilles/petroci-6.webp" alt="" style={{ height: '52%' }} />
@@ -89,14 +103,29 @@ export default function Presentation() {
             Recevez des commandes de votre quartier, mettez votre stock à jour depuis votre téléphone et suivez vos ventes.
             L’inscription est gratuite ; l’équipe iGaz valide chaque dépôt.
           </p>
-          <div><Link className="btn" href="/connexion?next=%2Ffournisseur%2Finscription">Inscrire mon dépôt</Link></div>
+          <div>
+            {VITRINE
+              ? <a className="btn" href={whatsapp('Bonjour, je tiens un dépôt de gaz et je souhaite rejoindre iGaz CI.')}>Nous contacter pour inscrire mon dépôt</a>
+              : <Link className="btn" href="/connexion?next=%2Ffournisseur%2Finscription">Inscrire mon dépôt</Link>}
+          </div>
         </section>
 
-        <section className="card stack landing-final" aria-labelledby="install">
-          <h2 id="install">Installez iGaz CI sur votre téléphone</h2>
-          <p className="muted">L’application s’ouvre depuis votre écran d’accueil, en plein écran, et vous prévient à chaque étape de votre commande.</p>
-          <InstallApp />
-        </section>
+        {VITRINE ? (
+          <section className="card stack landing-final" aria-labelledby="contact">
+            <h2 id="contact">Une question ?</h2>
+            <p className="muted">Écrivez-nous : nous répondons aux clients comme aux dépôts.</p>
+            <div className="cluster">
+              <a className="btn" href={whatsapp('Bonjour iGaz CI, j’ai une question.')}>Écrire sur WhatsApp</a>
+              {COMPANY.email && <a className="btn btn-quiet" href={`mailto:${COMPANY.email}`}>Envoyer un e-mail</a>}
+            </div>
+          </section>
+        ) : (
+          <section className="card stack landing-final" aria-labelledby="install">
+            <h2 id="install">Installez iGaz CI sur votre téléphone</h2>
+            <p className="muted">L’application s’ouvre depuis votre écran d’accueil, en plein écran, et vous prévient à chaque étape de votre commande.</p>
+            <InstallApp />
+          </section>
+        )}
       </main>
 
       <footer className="landing-foot">
@@ -106,9 +135,13 @@ export default function Presentation() {
             <Link href="/aide">Aide et contact</Link>
             <Link href="/conditions">Conditions d’utilisation</Link>
             <Link href="/confidentialite">Confidentialité</Link>
+            <Link href="/remboursements">Remboursements</Link>
             <Link href="/compte/supprimer">Supprimer mon compte</Link>
           </nav>
-          <p className="small muted">© 2026 iGaz CI. Les marques de gaz citées appartiennent à leurs propriétaires.</p>
+          <p className="small muted">
+            © 2026 {COMPANY.brand}, service de {COMPANY.legalName}{COMPANY.rccm ? `, RCCM ${COMPANY.rccm}` : ''}{COMPANY.address ? `, ${COMPANY.address}` : ''}.
+            Les marques de gaz citées appartiennent à leurs propriétaires.
+          </p>
         </div>
       </footer>
     </div>
