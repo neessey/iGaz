@@ -6,6 +6,7 @@ Démo **privée** d'iGaz, en attendant le prestataire SMS et l'agrégateur de pa
 | --- | --- | --- | --- |
 | `igaz-web` | `web/` | https://igaz-web.vercel.app | Connexion Vercel obligatoire sur **toutes** les adresses (`ssoProtection: all`) |
 | `igaz-api` | `backend/` | https://igaz-api-devyans-projects-805b7991.vercel.app | Aucune : les appels du site doivent passer ; voir « Clé de démo » |
+| `igaz-ci` | `web/` (mode vitrine) | https://igaz-ci.vercel.app | **Public** : présentation et pages légales seulement (`NEXT_PUBLIC_SITE_MODE=vitrine`), jamais de clé de démo ; adresse donnée à Paystack |
 
 Les deux projets sont reliés à `github.com/neessey/iGaz`. Le déploiement de production est créé depuis la branche de
 travail (`refonte-pwa-panier`) ; un envoi sur GitHub crée des prévisualisations.

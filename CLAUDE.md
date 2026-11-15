@@ -94,7 +94,8 @@ gardée en base dans `ProductPhoto`, règles dans `photo-rules.ts`) : elle passe
 
 ## Démo en ligne (voir `docs/vercel.md`)
 
-Démo privée sur Vercel : `igaz-web` (protégé sur toutes les adresses) et `igaz-api` + base Neon. Connexion par clé de
+Démo privée sur Vercel : `igaz-web` (protégé sur toutes les adresses) et `igaz-api` + base Neon. Site vitrine **public**
+`igaz-ci` (https://igaz-ci.vercel.app, même code en mode vitrine, sans clé de démo ni accès à l'application). Connexion par clé de
 démo (`DEMO_ACCESS_KEY`) tant qu'il n'y a pas de prestataire SMS : ne jamais rendre le site public avec cette clé.
 
 ## Publication Play Store (voir `docs/android.md`)
