@@ -125,6 +125,8 @@ démo (`DEMO_ACCESS_KEY`) tant qu'il n'y a pas de prestataire SMS : ne jamais re
    `/payments/paystack/webhook` signé HMAC-SHA512 puis revérifié par `/transaction/verify` ; montants XOF ×100 ; page de
    paiement gardée dans `Payment.checkoutUrl`). Reste : activation du compte (compte bancaire au nom d'Alees),
    reversements aux dépôts. Le webhook générique `/payments/webhook` (`x-igaz-signature`) sert aux tests.
+   **Masqué au lancement** (décision du 16/11/2026) : mobile money proposé seulement avec `MOBILE_MONEY_ENABLED=true`
+   (`mobileMoneyEnabled`, `order-rules.ts`), sinon paiement à la remise uniquement, et l'API refuse le mobile money.
 4. ~~Notifications~~ : fait (application, push, SMS optionnel). Reste : clés VAPID de production.
 5. **Stockage des documents fournisseurs** (aujourd'hui : URL seulement).
 6. **Limitation de débit**, CI GitHub Actions (tests unitaires + e2e avec PostgreSQL), remboursements manuels côté admin.

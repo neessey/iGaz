@@ -12,7 +12,7 @@ const FAQ: [string, string][] = [
   ['Échange ou achat simple, quelle différence ?', 'En échange, vous remettez une bouteille vide de même marque et de même taille : vous ne payez que le gaz. En achat simple, vous payez aussi la bouteille.'],
   ['Puis-je commander chez plusieurs dépôts ?', 'Oui, jusqu’à 3 dépôts dans le même panier. Vous recevez une commande par dépôt, chacune avec son code de remise, et vous payez en une fois.'],
   ['À quoi sert le code de remise ?', 'Il prouve que vous avez bien reçu la bouteille. Donnez-le au livreur ou au dépôt seulement quand vous l’avez en main.'],
-  ['Comment payer ?', 'Par mobile money avant la préparation, ou à la remise de la bouteille. En mobile money, la commande part au dépôt dès que l’opérateur confirme le paiement.'],
+  ['Comment payer ?', 'À la remise de la bouteille : au livreur ou au dépôt si vous la retirez. Le paiement en ligne par mobile money arrivera bientôt dans l’application.'],
   ['Comment annuler ?', 'Dans « Mes commandes », ouvrez la commande et touchez « Annuler » tant que le dépôt ne l’a pas acceptée. Après, appelez le dépôt.'],
   ['Quelles communes sont livrées ?', 'Les 13 communes du District d’Abidjan, selon les dépôts : chaque dépôt indique les communes qu’il livre. Vous pouvez aussi retirer au dépôt.'],
   ['Je vends du gaz, comment rejoindre iGaz ?', 'Touchez « Vous vendez du gaz ? » en bas de l’accueil. L’équipe iGaz vérifie votre dépôt avant de l’afficher.'],

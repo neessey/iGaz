@@ -1,8 +1,20 @@
 import {
-  canTransition, checkoutShapeError, isExchangeCompatible, isStoreOpenNow, normalizeIvorianPhone, orderTotals, TRANSITIONS,
+  canTransition, checkoutShapeError, isExchangeCompatible, isStoreOpenNow, mobileMoneyEnabled, normalizeIvorianPhone, orderTotals,
+  TRANSITIONS,
 } from './order-rules';
 
 describe('order-rules', () => {
+  describe('paiement mobile money (masqué au lancement)', () => {
+    it('n’est proposé que si MOBILE_MONEY_ENABLED vaut true', () => {
+      expect(mobileMoneyEnabled(undefined)).toBe(false);
+      expect(mobileMoneyEnabled('')).toBe(false);
+      expect(mobileMoneyEnabled('false')).toBe(false);
+      expect(mobileMoneyEnabled('1')).toBe(false);
+      expect(mobileMoneyEnabled('true')).toBe(true);
+      expect(mobileMoneyEnabled(' TRUE ')).toBe(true);
+    });
+  });
+
   describe('panier multi-dépôts', () => {
     const store = (storeId: string, n = 1) => ({ storeId, items: Array.from({ length: n }, () => ({})) });
 

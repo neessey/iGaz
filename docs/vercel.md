@@ -41,6 +41,10 @@ la clé n'est lisible que par les personnes autorisées sur Vercel.
 
 ## Paiement par Paystack
 
+**Au lancement, le mobile money est masqué** : sans `MOBILE_MONEY_ENABLED=true` sur `igaz-api`, l'appli ne propose que le
+paiement à la remise et l'API refuse une commande en mobile money. Le mettre à `true` quand Paystack est activé au nom
+d'Alees (et revoir alors la question « Comment payer ? » de `web/app/aide/page.tsx` et la présentation).
+
 Avec `PAYSTACK_SECRET_KEY` sur `igaz-api`, le paiement mobile money ouvre la page de paiement Paystack (Wave,
 Orange Money, MTN, carte) puis revient sur la commande. Commencer par la **clé de test** (`sk_test_…`) : aucun argent
 réel. Dans le tableau de bord Paystack (Settings → API Keys & Webhooks), déclarer l'adresse de notification

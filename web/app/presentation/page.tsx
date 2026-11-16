@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 const STEPS: { icon: IconName; title: string; text: string }[] = [
   { icon: 'pin', title: 'Choisissez votre commune', text: 'Les dépôts qui livrent chez vous s’affichent, avec leur stock du moment.' },
   { icon: 'cart', title: 'Rechargez ou achetez', text: 'B6, B12, B24 ou B28 : échangez votre bouteille vide ou prenez-en une neuve.' },
-  { icon: 'truck', title: 'Faites-vous livrer', text: 'Ou passez la retirer au dépôt. Payez à la livraison ou par mobile money.' },
+  { icon: 'truck', title: 'Faites-vous livrer', text: 'Ou passez la retirer au dépôt. Payez à la remise de la bouteille.' },
 ];
 
 const REASONS: { icon: IconName; title: string; text: string }[] = [

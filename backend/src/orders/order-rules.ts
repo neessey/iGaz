@@ -31,6 +31,15 @@ export function isExchangeCompatible(
     returned.brandId === product.brandId && returned.cylinderTypeId === product.cylinderTypeId;
 }
 
+/**
+ * Paiement mobile money : proposé seulement si MOBILE_MONEY_ENABLED vaut « true ». Masqué au lancement tant que
+ * l'agrégateur de paiement n'est pas activé au nom de la société ; le paiement à la remise reste toujours possible.
+ */
+export function mobileMoneyEnabled(flag: string | undefined): boolean {
+  return flag?.trim().toLowerCase() === 'true';
+}
+export const MOBILE_MONEY_UNAVAILABLE = 'Le paiement mobile money n’est pas encore disponible : choisissez le paiement à la remise';
+
 /** Panier multi-dépôts : au plus 3 dépôts, pour un suivi lisible et peu de remboursements partiels. */
 export const MAX_STORES_PER_CHECKOUT = 3;
 export const MAX_ITEMS_PER_ORDER = 10;

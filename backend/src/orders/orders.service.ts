@@ -12,7 +12,10 @@ import { FeeSettings, orderFees } from '../revenue/fees';
 import { RevenueService } from '../revenue/revenue.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
 import { CreateCheckoutDto, CreateOrderDto } from './orders.dto';
-import { canTransition, checkoutShapeError, isExchangeCompatible, isStoreOpenNow, orderTotals, STOCK_HELD } from './order-rules';
+import {
+  canTransition, checkoutShapeError, isExchangeCompatible, isStoreOpenNow, MOBILE_MONEY_UNAVAILABLE, mobileMoneyEnabled,
+  orderTotals, STOCK_HELD,
+} from './order-rules';
 
 const ORDER_INCLUDE = {
   items: { include: { product: { include: { brand: true, cylinderType: true } } } },
@@ -217,7 +220,15 @@ export class OrdersService {
     return order;
   }
 
+  /** Mobile money désactivé (lancement) : refusé avant toute écriture. */
+  private assertPaymentAvailable(method: PaymentMethod) {
+    if (method === 'MOBILE_MONEY' && !mobileMoneyEnabled(this.config.get<string>('MOBILE_MONEY_ENABLED'))) {
+      throw new BadRequestException(MOBILE_MONEY_UNAVAILABLE);
+    }
+  }
+
   async create(user: User, dto: CreateOrderDto) {
+    this.assertPaymentAvailable(dto.paymentMethod);
     const address = await this.resolveAddress(user, dto.fulfillment === 'DELIVERY', dto.addressId);
     const prepared = await this.prepare(dto, dto.paymentMethod, address, await this.revenue.settings());
     const created = await this.prisma.$transaction((tx) => this.write(tx, user, prepared, dto.paymentMethod));
@@ -233,6 +244,7 @@ export class OrdersService {
   async checkout(user: User, dto: CreateCheckoutDto) {
     const shape = checkoutShapeError(dto.stores);
     if (shape) throw new BadRequestException(shape);
+    this.assertPaymentAvailable(dto.paymentMethod);
     const address = await this.resolveAddress(user, dto.stores.some((s) => s.fulfillment === 'DELIVERY'), dto.addressId);
 
     const prepared: Awaited<ReturnType<OrdersService['prepare']>>[] = [];

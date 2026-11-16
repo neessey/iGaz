@@ -1,18 +1,20 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Role, User } from '@prisma/client';
 import { CurrentUser, Public, Roles } from '../common/decorators';
+import { mobileMoneyEnabled } from '../orders/order-rules';
 import { MonthQuery, SettleDto, UpdateFeesDto } from './revenue.dto';
 import { RevenueService } from './revenue.service';
 
 @Controller()
 export class RevenueController {
-  constructor(private readonly revenue: RevenueService) {}
+  constructor(private readonly revenue: RevenueService, private readonly config: ConfigService) {}
 
-  /** Frais de service en vigueur : affichés au client avant qu'il valide son panier. */
+  /** Frais de service en vigueur et moyens de paiement proposés : affichés au client avant qu'il valide son panier. */
   @Public() @Get('catalog/fees')
   async fees() {
     const { serviceFee } = await this.revenue.settings();
-    return { serviceFee };
+    return { serviceFee, mobileMoney: mobileMoneyEnabled(this.config.get<string>('MOBILE_MONEY_ENABLED')) };
   }
 
   @Roles(Role.ADMIN) @Get('admin/revenue/settings')

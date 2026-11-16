@@ -23,7 +23,9 @@ function Checkout() {
   const [addressChoice, setAddressChoice] = useState('new');
   const [newZone, setNewZone] = useState('');
   const [newDetails, setNewDetails] = useState('');
-  const [payment, setPayment] = useState<'MOBILE_MONEY' | 'CASH_ON_DELIVERY'>('MOBILE_MONEY');
+  // Paiement à la remise par défaut ; mobile money seulement si l'API le propose (masqué au lancement).
+  const [payment, setPayment] = useState<'MOBILE_MONEY' | 'CASH_ON_DELIVERY'>('CASH_ON_DELIVERY');
+  const [mobileMoney, setMobileMoney] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +50,11 @@ function Checkout() {
   // Frais de service d'iGaz, ajoutés à chaque commande (une par dépôt) ; l'API refait le calcul à la création.
   const [serviceFee, setServiceFee] = useState(0);
   useEffect(() => {
-    api<{ serviceFee: number }>('/catalog/fees').then((f) => setServiceFee(f.serviceFee)).catch(() => undefined);
+    api<{ serviceFee: number; mobileMoney?: boolean }>('/catalog/fees').then((f) => {
+      setServiceFee(f.serviceFee);
+      setMobileMoney(!!f.mobileMoney);
+      if (f.mobileMoney) setPayment('MOBILE_MONEY');
+    }).catch(() => undefined);
     api<Zone[]>('/catalog/zones').then(setZones).catch(() => undefined);
     api<Address[]>('/addresses').then((a) => { setAddresses(a); if (a[0]) setAddressChoice(a[0].id); }).catch(() => undefined);
   }, []);
@@ -212,10 +218,12 @@ function Checkout() {
 
       <section className="card stack-sm" aria-labelledby="pay">
         <h2 id="pay" className="cluster" style={{ gap: 8 }}><Icon name="wallet" size={20} />Paiement</h2>
-        <div className="segmented" role="radiogroup" aria-labelledby="pay">
-          <button role="radio" aria-checked={payment === 'MOBILE_MONEY'} onClick={() => setPayment('MOBILE_MONEY')}>Mobile money</button>
-          <button role="radio" aria-checked={payment === 'CASH_ON_DELIVERY'} onClick={() => setPayment('CASH_ON_DELIVERY')}>À la remise</button>
-        </div>
+        {mobileMoney ? (
+          <div className="segmented" role="radiogroup" aria-labelledby="pay">
+            <button role="radio" aria-checked={payment === 'MOBILE_MONEY'} onClick={() => setPayment('MOBILE_MONEY')}>Mobile money</button>
+            <button role="radio" aria-checked={payment === 'CASH_ON_DELIVERY'} onClick={() => setPayment('CASH_ON_DELIVERY')}>À la remise</button>
+          </div>
+        ) : <strong>À la remise</strong>}
         <p className="small muted">
           {payment === 'MOBILE_MONEY'
             ? (cart.groups.length > 1 ? 'Un seul paiement pour tous les dépôts.' : 'Vous payez avant que le dépôt ne prépare la commande.')

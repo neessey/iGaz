@@ -2,6 +2,7 @@ process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgresql://igaz:i
 process.env.JWT_SECRET = 'test-secret-test-secret-test-secret';
 process.env.PAYMENT_WEBHOOK_SECRET = 'webhook-test-secret';
 process.env.COD_MAX_AMOUNT = '100000';
+process.env.MOBILE_MONEY_ENABLED = 'true'; // désactivé au lancement : voir le test « mobile money masqué »
 
 import { INestApplication, ServiceUnavailableException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -485,6 +486,28 @@ describe('iGaz MVP — parcours complet', () => {
       return r.send(raw);
     };
 
+    it('mobile money masqué au lancement : non proposé et refusé, paiement à la remise toujours possible', async () => {
+      process.env.MOBILE_MONEY_ENABLED = 'false';
+      try {
+        expect((await http().get('/catalog/fees').expect(200)).body.mobileMoney).toBe(false);
+        await login('client2');
+        const addr = await http().post('/addresses').set(auth('client2')).send({ zoneId: ids.yop, details: 'Niangon nord' }).expect(201);
+        const before = await prisma.order.count();
+        const res = await http().post('/orders').set(auth('client2')).send({
+          storeId: ids.storeB, fulfillment: 'DELIVERY', paymentMethod: 'MOBILE_MONEY', addressId: addr.body.id,
+          items: [{ productId: ids.prodB, kind: 'PURCHASE', quantity: 1 }],
+        }).expect(400);
+        expect(JSON.stringify(res.body)).toContain('mobile money');
+        await http().post('/checkouts').set(auth('client2')).send({
+          paymentMethod: 'MOBILE_MONEY', addressId: addr.body.id,
+          stores: [{ storeId: ids.storeB, fulfillment: 'DELIVERY', items: [{ productId: ids.prodB, kind: 'PURCHASE', quantity: 1 }] }],
+        }).expect(400);
+        expect(await prisma.order.count()).toBe(before);
+      } finally {
+        process.env.MOBILE_MONEY_ENABLED = 'true';
+      }
+    });
+
     it('commande payable : la confirmation ne vient que du webhook signé, une seule fois', async () => {
       await http().put(`/stores/${ids.storeB}/products/${ids.prodB}/stock`).set(auth('supB')).send({ quantity: 5 }).expect(200);
       await login('client2');
@@ -824,7 +847,7 @@ describe('iGaz MVP — parcours complet', () => {
       const res = await http().patch('/admin/revenue/settings').set(auth('admin')).send({ serviceFee: 100, deliveryShare: 150 }).expect(200);
       expect(res.body).toEqual({ serviceFee: 100, deliveryShare: 150 });
       expect(await prisma.auditLog.count({ where: { action: 'FEES_UPDATE' } })).toBeGreaterThan(0);
-      expect((await http().get('/catalog/fees').expect(200)).body).toEqual({ serviceFee: 100 });
+      expect((await http().get('/catalog/fees').expect(200)).body).toEqual({ serviceFee: 100, mobileMoney: true });
     });
 
     it('frais figés sur la commande, relevé du dépôt, commandes non terminées exclues, règlement d’un mois terminé', async () => {
